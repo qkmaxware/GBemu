@@ -16,11 +16,14 @@ import java.util.ArrayList;
 import javax.swing.ButtonGroup;
 import javax.swing.JButton;
 import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JRadioButton;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.JTextArea;
+import javax.swing.JTextField;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.table.TableModel;
 
@@ -163,9 +166,56 @@ public class Debugger extends JFrame{
             
         });
         
+        JButton button3 = new JButton("Inject");
+        button3.addActionListener((evt) -> {
+            JTextField loc = new JTextField();
+            loc.setPreferredSize(new Dimension(120, 32));
+            JTextField value = new JTextField();
+            value.setPreferredSize(new Dimension(120, 32));
+            
+            JPanel panel = new JPanel();
+            panel.add(new JLabel("Addr:"));
+            panel.add(loc);
+            panel.add(new JLabel("V:"));
+            panel.add(value);
+            
+            int result = JOptionPane.showConfirmDialog(null, panel, 
+               "Value Injection Parameters", JOptionPane.OK_CANCEL_OPTION);
+            if (result == JOptionPane.OK_OPTION) {
+               try{
+                    String t = loc.getText();
+                    int a;
+                    if(t.matches("-?[0-9a-fA-F]+")){
+                        a = Integer.parseInt(t, 16);
+                    }else{
+                        a= Integer.parseInt(t);
+                    }
+                    int b = Integer.parseInt(value.getText());
+                    
+                    mmu.wb(a, b);
+               } catch(Exception e){
+                   JOptionPane.showMessageDialog(null, "Failed to set value into desired address");
+               }
+            }
+        });
+        
+        JButton button4 = new JButton("Run Op");
+        button4.addActionListener((evt) -> {
+            String r = JOptionPane.showInputDialog(null, "Select Opcode To Run");
+            try{
+                int i = Integer.parseInt(r);
+                gb.cpu.opcodes.Fetch(i).Invoke();
+            }catch(Exception e){
+                JOptionPane.showMessageDialog(null, "Failed to execute opcode");
+            }
+        });
+        
+        
         footer.add(displayMode);
         footer.add(button);
         footer.add(button2);
+        footer.add(button3);
+        footer.add(button4);
         
         this.add(footer, BorderLayout.SOUTH);
         

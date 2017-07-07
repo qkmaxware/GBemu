@@ -16,7 +16,7 @@ public class Cpu {
     
     private MemoryMap mmu;
     
-    private final Opcodes opcodes;
+    public final Opcodes opcodes;
     
     public Cpu(){
         opcodes = new Opcodes(this);
