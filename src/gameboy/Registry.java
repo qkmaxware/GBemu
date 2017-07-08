@@ -133,18 +133,21 @@ public class Registry {
         sp = i & Metrics.BIT16;
     }
     
+    //Increment the sp
+    public int sppp(int i){
+        int k = sp;
+        sp(sp += i);
+        return k;
+    }
+    
     public int pc(){
         return pc;
     }
     
-    //Increment the pc counter by 1, and return the value before incrementing
-    public int pcpp(){
-        return pc++;
-    }
-    
+    //Increment the pc
     public int pcpp(int i){
         int k = pc;
-        pc += i;
+        pc(pc += i);
         return k;
     }
    

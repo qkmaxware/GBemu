@@ -8,6 +8,7 @@ package utilities;
 import gameboy.Cpu;
 import gameboy.Gameboy;
 import gameboy.MemoryMap;
+import gameboy.Op;
 import gameboy.Registry;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
@@ -62,6 +63,7 @@ public class Debugger extends JFrame{
     private Table<String> registryTable = new Table<String>(2);
     private MemoryMap mmu;
     private Registry reg;
+    private Cpu cpu;
     private TableModel memoryModel;
     private TableModel registryModel;
     private int displayMode = 0;
@@ -70,6 +72,7 @@ public class Debugger extends JFrame{
         this.setLayout(new BorderLayout());
         this.mmu = gb.mmu;
         this.reg = gb.cpu.reg;
+        this.cpu = gb.cpu;
         
         String[] MemoryColumnNames = new String[]{"Address", "Value"};
         memoryModel = new AbstractTableModel(){
@@ -148,13 +151,17 @@ public class Debugger extends JFrame{
         decimal.setSelected(true);
         JRadioButton hex = new JRadioButton("hex");
         hex.addActionListener((evt) -> {displayMode = 1;});
+        JRadioButton opc = new JRadioButton("opcode");
+        opc.addActionListener((evt) -> {displayMode = 2;});
         
         group.add(decimal);
         group.add(hex);
+        group.add(opc);
         
         JPanel displayMode = new JPanel();
         displayMode.add(decimal);
         displayMode.add(hex);
+        displayMode.add(opc);
         
         JButton button = new JButton("Refresh");
         button.addActionListener((evt) -> {
@@ -237,6 +244,10 @@ public class Debugger extends JFrame{
                     break;
                 case 1:
                     row.set(1, String.format("0x%04X", mmu.rb(i)));
+                    break;
+                case 2:
+                    Op op = this.cpu.opcodes.Fetch(mmu.rb(i));
+                    row.set(1, op!=null ? op.toString() : ""+mmu.rb(i));
                     break;
             }            
         }
