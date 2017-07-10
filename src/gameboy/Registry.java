@@ -76,20 +76,35 @@ public class Registry {
         flags = i & Metrics.BIT8 & 0b11110000;
     }
     
+    /*
+    FLAG REGISTER BITS
+    7     6	5	4	3	2	1	0
+    Z	  N	H	C	0	0	0	0
+    */
+    public void clearFlags(){
+        flags = 0;
+    }
+    
     public boolean zero(){
         return (flags & 0b10000000) == 0b10000000;
     }
     
     public void zero(boolean b){
-        flags = (flags | (b ? 0b11111111 : 0b01111111));
+        if(b)
+            flags |= 0b10000000;
+        else 
+            flags &= 0b01111111;
     }
-    //TODO what is the 'n' flag
+
     public boolean subtract(){
         return (flags & 0b01000000) == 0b01000000;
     }
     
     public void subtract(boolean b){
-        flags = (flags | (b ? 0b11111111 : 0b10111111));
+        if(b)
+            flags |= 0b01000000;
+        else 
+            flags &= 0b10111111;
     }
     
     public boolean halfcarry(){
@@ -97,15 +112,21 @@ public class Registry {
     }
     
     public void halfcarry(boolean b){
-        flags = (flags | (b ? 0b11111111 : 0b11011111));
+        if(b)
+            flags |= 0b00100000;
+        else 
+            flags &= 0b11011111;
     }
     
     public boolean carry(){
         return (flags & 0b00010000) == 0b00010000;
     }
     
-    public void cary(boolean b){
-        flags = (flags | (b ? 0b11111111 : 0b11101111));
+    public void carry(boolean b){
+        if(b)
+            flags |= 0b00010000;
+        else 
+            flags &= 0b11101111;
     }
     
     public int h() {

@@ -18,8 +18,8 @@ public class Opcodes {
     private Clock clock;
     private MemoryMap mmu;
     
-    private Op[] map = new Op[255];
-    private Op[] cmap = new Op[255];
+    private Op[] map = new Op[256];
+    private Op[] cbmap = new Op[256];
     
     public Opcodes(Cpu cpu){
         this.cpu = cpu;
@@ -27,13 +27,26 @@ public class Opcodes {
         this.clock = cpu.clock;
         this.mmu = cpu.GetMmu();
         
-        int count = 0;
+        int count = 0; int ccount = 0;
         for(int i = 0 ; i < map.length; i++){
-            if(map[i] == null)
+            if(map[i] == null){
                 count++;
+                Op XX = new Op(i, "XX"+i, null, () -> {
+                    System.out.println("Unimplemented opcode called at "+(reg.pc() - 1)+" with opcode "+mmu.rb((reg.pc() - 1)));
+                });
+                map[i] = XX;
+            }
+            if(cbmap[i] == null){
+                ccount++;
+                Op XX = new Op(i, "XX"+i, null, () -> {
+                    System.out.println("Unimplemented opcode called at "+(reg.pc() - 1)+" with opcode "+mmu.rb((reg.pc() - 1)));
+                });
+                cbmap[i] = XX;
+            }
         }
         
         System.out.println(count+" base opcodes undefined");
+        System.out.println(ccount+" CB opcodes undefined");
         /*
         map = new Op[]{
             NOP, LDBCnn, LDBCmA, INCBC,
@@ -188,9 +201,12 @@ public class Opcodes {
     //--------------------------------------------------------------------------
     // Helper functions
     //--------------------------------------------------------------------------
-    private boolean invokeCb(int i){
-        if(i > 0 && i < cmap.length){
-            cmap[i].Invoke();
+    
+    private boolean invokeCb(int i){ //map to CB
+        //int i=MMU.rb(Reg.pc); Reg.pc++;
+	//Reg.pc &= 65535;
+        if(i > 0 && i < cbmap.length){
+            cbmap[i].Invoke();
             return true;
         }
         return false;
@@ -201,10 +217,34 @@ public class Opcodes {
         int result = i + j;
         reg.f(0);   //Clear flag before proceeding
         reg.zero((result & Metrics.BIT8) == 0);                                 //Zero flag set when op is 0
-        reg.cary(result > 255 || result < 0); //Or a 1 is bitshifted out        //Carry flag set on overflow
+        reg.carry(result > 255 || result < 0); //Or a 1 is bitshifted out        //Carry flag set on overflow
         reg.subtract(sign < 0);                                                 //Set on subtraction operaton
-        reg.halfcarry((((i & 0xf) + (j & 0xf)) & 0x10) == 0x10);                //Set on half-carry
+        reg.halfcarry(isHalfCarry(i,j));                //Set on half-carry
         return result;
+    }
+    
+    private boolean isHalfCarry(int a, int b){
+        return(((a & 0xf) + (b & 0xf)) & 0x10) == 0x10;
+    }
+    
+    private boolean isHalfCarry16(int a, int b){
+        return(((a & 0xff) + (b & 0xff)) & 0x100) == 0x100;
+    }
+    
+    private boolean isCarry16(int i){
+        return i > 65535 || i < 0;
+    }
+    
+    private boolean isCarry(int i){
+        return i > 255 || i < 0;
+    }
+    
+    private boolean isZero(int i, int max){
+        return (i & max) == 0;
+    }
+    
+    private boolean isZero(int i){
+        return isZero(i, Metrics.BIT8);
     }
     
     private int arfz(int i, int j){
@@ -925,5 +965,2397 @@ public class Opcodes {
     // 16 Bit Loads
     ///
     
+    //Put 16bit immediate value into register BC
+    Op LD_BC_nn = new Op(0x01, "LD BC,nn", map, () -> {
+        int v = mmu.rw(reg.pc());
+        reg.bc(v);
+        reg.pcpp(2);
+        clock.m(3);
+        clock.t(12);
+    });
     
+    //Put 16bit immediate value into register DE
+    Op LD_DE_nn = new Op(0x11, "LD DE,nn", map, () -> {
+        int v = mmu.rw(reg.pc());
+        reg.de(v);
+        reg.pcpp(2);
+        clock.m(3);
+        clock.t(12);
+    });
+    
+    //Put 16bit immediate value into register HL
+    Op LD_HL_nn = new Op(0x21, "LD HL,nn", map, () -> {
+        int v = mmu.rw(reg.pc());
+        reg.hl(v);
+        reg.pcpp(2);
+        clock.m(3);
+        clock.t(12);
+    });
+    
+    //Put 16bit immediate value into register HL
+    Op LD_SP_nn = new Op(0x31, "LD SP,nn", map, () -> {
+        int v = mmu.rw(reg.pc());
+        reg.sp(v);
+        reg.pcpp(2);
+        clock.m(3);
+        clock.t(12);
+    });
+    
+    //Put HL into stack pointer register SP TODO
+    Op LD_SP_HL = new Op(0xF9, "LD SP,HL", map, () -> {
+        int v = reg.hl();
+        reg.sp(v);
+        clock.m(2);
+        clock.t(8);
+    });
+    
+    //Put SP + n into HL, (n is a 8bit signed value)
+    //Flags Z-Reset, N-Reset, H-Set or Reset, C-Set or Reset
+    Op LDHL_SP_n = new Op(0xF8, "LDHL SP,n", map, () -> {
+        int n =  mmu.rb(reg.pc());
+        if(n > 127) //Signed stranformation
+            n = -((~n+1)&255);
+        int sp = reg.sp();
+        reg.hl(sp + n);
+        reg.pcpp(1);
+        clock.m(3);
+        clock.t(12);
+        
+        reg.zero(false);
+        reg.subtract(false);
+        reg.halfcarry(isHalfCarry(sp,n));
+        reg.carry(isCarry(sp + n));
+    });
+    
+    //Put stack pointer into memory at nn //TODO
+    Op LD_nn_SP = new Op(0x08, "LD (nn),SP", map, () -> {
+        int v = reg.sp();
+        mmu.ww(v, mmu.rw(reg.pc()));
+        reg.pcpp(2);
+        clock.m(5);
+        clock.t(20);
+    });
+    
+    //Push register pair AF onto the stack, Decrement Stack Pointer Twice
+    Op PUSH_AF = new Op(0xF5, "PUSH AF", map, () -> {
+        reg.sppp(-2);
+        mmu.ww(reg.sp(), reg.af());
+        clock.m(4);
+        clock.t(16);
+    });
+    
+    //Push register pair BC onto the stack, Decrement Stack Pointer Twice
+    Op PUSH_BC = new Op(0xC5, "PUSH BC", map, () -> {
+        reg.sppp(-2);
+        mmu.ww(reg.sp(), reg.bc());
+        clock.m(4);
+        clock.t(16);
+    });
+    
+    //Push register pair DE onto the stack, Decrement Stack Pointer Twice
+    Op PUSH_DE = new Op(0xD5, "PUSH DE", map, () -> {
+        reg.sppp(-2);
+        mmu.ww(reg.sp(), reg.de());
+        clock.m(4);
+        clock.t(16);
+    });
+    
+    //Push register pair HL onto the stack, Decrement Stack Pointer Twice
+    Op PUSH_HL = new Op(0xE5, "PUSH HL", map, () -> {
+        reg.sppp(-2);
+        mmu.ww(reg.sp(), reg.hl()); //TODO confirm if this is the same as sp-- wb(h) sp-- wb(l)
+        clock.m(4); //TODO 3 and 12 or 4 and 16? different sources say different things
+        clock.t(16);
+    });
+    
+    //Pop value off stack into register AF
+    Op POP_AF = new Op(0xF1, "POP AF", map, () -> {
+        int v = mmu.rw(reg.sp()); //TODO confirm if this is the same as sp-- wb(h) sp-- wb(l)
+        reg.af(v);
+        reg.sppp(2);
+        clock.m(3);
+        clock.t(12);
+    });
+    
+    //Pop value off stack into register BC
+    Op POP_BC = new Op(0xC1, "POP BC", map, () -> {
+        int v = mmu.rw(reg.sp()); //TODO confirm if this is the same as sp-- wb(h) sp-- wb(l)
+        reg.bc(v);
+        reg.sppp(2);
+        clock.m(3);
+        clock.t(12);
+    });
+    
+    //Pop value off stack into register DE
+    Op POP_DE = new Op(0xD1, "POP DE", map, () -> {
+        int v = mmu.rw(reg.sp()); //TODO confirm if this is the same as sp-- wb(h) sp-- wb(l)
+        reg.de(v);
+        reg.sppp(2);
+        clock.m(3);
+        clock.t(12);
+    });
+    
+    //Pop value off stack into register HL
+    Op POP_HL = new Op(0xE1, "POP HL", map, () -> {
+        int v = mmu.rw(reg.sp()); //TODO confirm if this is the same as sp-- wb(h) sp-- wb(l)
+        reg.hl(v);
+        reg.sppp(2);
+        clock.m(3);
+        clock.t(12);
+    });
+    
+    //PAGE 80
+    
+    ///
+    // 8 Bit ALU
+    ///
+    
+    //Add register A and register A into register A
+    Op ADD_A_A = new Op(0x87, "ADD A,A", map, () -> {
+        int a = reg.a();
+        int b = reg.a();
+        int v = a + b;
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(isHalfCarry(a, b));
+        reg.carry(isCarry(v));
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Add register A and register B into register A
+    Op ADD_A_B = new Op(0x80, "ADD A,B", map, () -> {
+        int a = reg.a();
+        int b = reg.b();
+        int v = a + b;
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(isHalfCarry(a, b));
+        reg.carry(isCarry(v));
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Add register A and register C into register A
+    Op ADD_A_C = new Op(0x81, "ADD A,C", map, () -> {
+        int a = reg.a();
+        int b = reg.c();
+        int v = a + b;
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(isHalfCarry(a, b));
+        reg.carry(isCarry(v));
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Add register A and register D into register A
+    Op ADD_A_D = new Op(0x82, "ADD A,D", map, () -> {
+        int a = reg.a();
+        int b = reg.d();
+        int v = a + b;
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(isHalfCarry(a, b));
+        reg.carry(isCarry(v));
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Add register A and register E into register A
+    Op ADD_A_E = new Op(0x83, "ADD A,E", map, () -> {
+        int a = reg.a();
+        int b = reg.e();
+        int v = a + b;
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(isHalfCarry(a, b));
+        reg.carry(isCarry(v));
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Add register A and register H into register A
+    Op ADD_A_H = new Op(0x84, "ADD A,H", map, () -> {
+        int a = reg.a();
+        int b = reg.h();
+        int v = a + b;
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(isHalfCarry(a, b));
+        reg.carry(isCarry(v));
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Add register A and register L into register A
+    Op ADD_A_L = new Op(0x85, "ADD A,L", map, () -> {
+        int a = reg.a();
+        int b = reg.l();
+        int v = a + b;
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(isHalfCarry(a, b));
+        reg.carry(isCarry(v));
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Add register A and memory at HL into register A
+    Op ADD_A_HL = new Op(0x86, "ADD A,(HL)", map, () -> {
+        int a = reg.a();
+        int b = mmu.rb(reg.hl());
+        int v = a + b;
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(isHalfCarry(a, b));
+        reg.carry(isCarry(v));
+        
+        clock.m(2);
+        clock.t(8);
+    });
+    
+    //Add register A and immediate value 'n' into register A
+    Op ADD_A_n = new Op(0xC6, "ADD A,n", map, () -> {
+        int a = reg.a();
+        int b = mmu.rb(reg.pc());
+        int v = a + b;
+        reg.a(v);
+        reg.pcpp(1);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(isHalfCarry(a, b));
+        reg.carry(isCarry(v));
+        
+        clock.m(2);
+        clock.t(8);
+    });
+    
+    //Add A + Carry Flag into registry A
+    Op ADC_A_A = new Op(0x8F, "ADC A,A", map, () -> {
+        int n = reg.a(); //Change me
+        int c = (reg.carry() ? 1 : 0);
+        int i = n + c;
+        int a = reg.a();
+        int v = i + a;  
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(isHalfCarry(i,a));
+        reg.carry(isCarry(v));
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Add B + Carry Flag into registry A
+    Op ADC_A_B = new Op(0x88, "ADC A,B", map, () -> {
+        int n = reg.b(); //Change me
+        int c = (reg.carry() ? 1 : 0);
+        int i = n + c;
+        int a = reg.a();
+        int v = i + a;  
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(isHalfCarry(i,a));
+        reg.carry(isCarry(v));
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Add C + Carry Flag into registry A
+    Op ADC_A_C = new Op(0x89, "ADC A,C", map, () -> {
+        int n = reg.c(); //Change me
+        int c = (reg.carry() ? 1 : 0);
+        int i = n + c;
+        int a = reg.a();
+        int v = i + a;  
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(isHalfCarry(i,a));
+        reg.carry(isCarry(v));
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Add D + Carry Flag into registry A
+    Op ADC_A_D = new Op(0x8A, "ADC A,D", map, () -> {
+        int n = reg.d(); //Change me
+        int c = (reg.carry() ? 1 : 0);
+        int i = n + c;
+        int a = reg.a();
+        int v = i + a;  
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(isHalfCarry(i,a));
+        reg.carry(isCarry(v));
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Add E + Carry Flag into registry A
+    Op ADC_A_E = new Op(0x8B, "ADC A,E", map, () -> {
+        int n = reg.e(); //Change me
+        int c = (reg.carry() ? 1 : 0);
+        int i = n + c;
+        int a = reg.a();
+        int v = i + a;  
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(isHalfCarry(i,a));
+        reg.carry(isCarry(v));
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Add H + Carry Flag into registry A
+    Op ADC_A_H = new Op(0x8C, "ADC A,H", map, () -> {
+        int n = reg.h(); //Change me
+        int c = (reg.carry() ? 1 : 0);
+        int i = n + c;
+        int a = reg.a();
+        int v = i + a;  
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(isHalfCarry(i,a));
+        reg.carry(isCarry(v));
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Add L + Carry Flag into registry A
+    Op ADC_A_L = new Op(0x8D, "ADC A,L", map, () -> {
+        int n = reg.l(); //Change me
+        int c = (reg.carry() ? 1 : 0);
+        int i = n + c;
+        int a = reg.a();
+        int v = i + a;  
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(isHalfCarry(i,a));
+        reg.carry(isCarry(v));
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Add memory at HL + Carry Flag into registry A
+    Op ADC_A_HL = new Op(0x8E, "ADC A,(HL)", map, () -> {
+        int n = mmu.rb(reg.hl()); //Change me
+        int c = (reg.carry() ? 1 : 0);
+        int i = n + c;
+        int a = reg.a();
+        int v = i + a;  
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(isHalfCarry(i,a));
+        reg.carry(isCarry(v));
+        
+        clock.m(2);
+        clock.t(8);
+    });
+    
+    //Add immediate value n + Carry Flag into registry A
+    Op ADC_A_n = new Op(0xCE, "ADC A,n", map, () -> {
+        int n = mmu.rb(reg.pc()); //Change me
+        int c = (reg.carry() ? 1 : 0);
+        int i = n + c;
+        int a = reg.a();
+        int v = i + a;  
+        reg.a(v);
+        reg.pcpp(1);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(isHalfCarry(i,a));
+        reg.carry(isCarry(v));
+        
+        clock.m(2);
+        clock.t(8);
+    });
+    
+    //Subtract register A from register A
+    Op SUB_A_A = new Op(0x97, "SUB A,A", map, () -> {
+        int n = reg.a(); //Change me
+        int a = reg.a();
+        int v = a - n;
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(true);
+        reg.halfcarry(isHalfCarry(a, -n)); //WATCH THIS
+        reg.carry(isCarry(v));
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Subtract register B from register A
+    Op SUB_A_B = new Op(0x90, "SUB A,B", map, () -> {
+        int n = reg.b(); //Change me
+        int a = reg.a();
+        int v = a - n;
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(true);
+        reg.halfcarry(isHalfCarry(a, -n)); //WATCH THIS
+        reg.carry(isCarry(v));
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Subtract register C from register A
+    Op SUB_A_C = new Op(0x91, "SUB A,C", map, () -> {
+        int n = reg.c(); //Change me
+        int a = reg.a();
+        int v = a - n;
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(true);
+        reg.halfcarry(isHalfCarry(a, -n)); //WATCH THIS
+        reg.carry(isCarry(v));
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Subtract register D from register A
+    Op SUB_A_D = new Op(0x92, "SUB A,D", map, () -> {
+        int n = reg.d(); //Change me
+        int a = reg.a();
+        int v = a - n;
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(true);
+        reg.halfcarry(isHalfCarry(a, -n)); //WATCH THIS
+        reg.carry(isCarry(v));
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Subtract register E from register A
+    Op SUB_A_E = new Op(0x93, "SUB A,E", map, () -> {
+        int n = reg.e(); //Change me
+        int a = reg.a();
+        int v = a - n;
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(true);
+        reg.halfcarry(isHalfCarry(a, -n)); //WATCH THIS
+        reg.carry(isCarry(v));
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Subtract register CHfrom register A
+    Op SUB_A_H = new Op(0x94, "SUB A,H", map, () -> {
+        int n = reg.h(); //Change me
+        int a = reg.a();
+        int v = a - n;
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(true);
+        reg.halfcarry(isHalfCarry(a, -n)); //WATCH THIS
+        reg.carry(isCarry(v));
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Subtract register L from register A
+    Op SUB_A_L = new Op(0x95, "SUB A,L", map, () -> {
+        int n = reg.l(); //Change me
+        int a = reg.a();
+        int v = a - n;
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(true);
+        reg.halfcarry(isHalfCarry(a, -n)); //WATCH THIS
+        reg.carry(isCarry(v));
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Subtract memory at HL from register A
+    Op SUB_A_HL = new Op(0x96, "SUB A,(HL)", map, () -> {
+        int n = mmu.rb(reg.hl()); //Change me
+        int a = reg.a();
+        int v = a - n;
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(true);
+        reg.halfcarry(isHalfCarry(a, -n)); //WATCH THIS
+        reg.carry(isCarry(v));
+        
+        clock.m(2);
+        clock.t(8);
+    });
+    
+    //Subtract immediate value n from register A
+    Op SUB_A_n = new Op(0xD6, "SUB A,n", map, () -> {
+        int n = mmu.rb(reg.pc()); //Change me
+        int a = reg.a();
+        int v = a - n;
+        reg.a(v);
+        reg.pcpp(1);
+        
+        reg.zero(isZero(v));
+        reg.subtract(true);
+        reg.halfcarry(isHalfCarry(a, -n)); //WATCH THIS
+        reg.carry(isCarry(v));
+        
+        clock.m(2);
+        clock.t(8);
+    });
+    
+    //Subtract A + Carry flag from register A
+    Op SBC_A_A = new Op(0x9F, "SBC A,A", map, () -> {
+        int n = reg.a(); //Change me
+        int c = (reg.carry() ? 1 : 0);
+        int i = c + n;
+        int a = reg.a();
+        int v = a - i;
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(true);
+        reg.halfcarry(isHalfCarry(a, -i)); //WATCH THIS
+        reg.carry(isCarry(v));
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Subtract B + Carry flag from register A
+    Op SBC_A_B = new Op(0x98, "SBC A,B", map, () -> {
+        int n = reg.b(); //Change me
+        int c = (reg.carry() ? 1 : 0);
+        int i = c + n;
+        int a = reg.a();
+        int v = a - i;
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(true);
+        reg.halfcarry(isHalfCarry(a, -i)); //WATCH THIS
+        reg.carry(isCarry(v));
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Subtract C + Carry flag from register A
+    Op SBC_A_C = new Op(0x99, "SBC A,C", map, () -> {
+        int n = reg.c(); //Change me
+        int c = (reg.carry() ? 1 : 0);
+        int i = c + n;
+        int a = reg.a();
+        int v = a - i;
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(true);
+        reg.halfcarry(isHalfCarry(a, -i)); //WATCH THIS
+        reg.carry(isCarry(v));
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Subtract D + Carry flag from register A
+    Op SBC_A_D = new Op(0x9A, "SBC A,D", map, () -> {
+        int n = reg.d(); //Change me
+        int c = (reg.carry() ? 1 : 0);
+        int i = c + n;
+        int a = reg.a();
+        int v = a - i;
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(true);
+        reg.halfcarry(isHalfCarry(a, -i)); //WATCH THIS
+        reg.carry(isCarry(v));
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Subtract E + Carry flag from register A
+    Op SBC_A_E = new Op(0x9B, "SBC A,E", map, () -> {
+        int n = reg.e(); //Change me
+        int c = (reg.carry() ? 1 : 0);
+        int i = c + n;
+        int a = reg.a();
+        int v = a - i;
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(true);
+        reg.halfcarry(isHalfCarry(a, -i)); //WATCH THIS
+        reg.carry(isCarry(v));
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    
+    //Subtract H + Carry flag from register A
+    Op SBC_A_H = new Op(0x9C, "SBC A,H", map, () -> {
+        int n = reg.h(); //Change me
+        int c = (reg.carry() ? 1 : 0);
+        int i = c + n;
+        int a = reg.a();
+        int v = a - i;
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(true);
+        reg.halfcarry(isHalfCarry(a, -i)); //WATCH THIS
+        reg.carry(isCarry(v));
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Subtract L + Carry flag from register A
+    Op SBC_A_L = new Op(0x9D, "SBC A,L", map, () -> {
+        int n = reg.l(); //Change me
+        int c = (reg.carry() ? 1 : 0);
+        int i = c + n;
+        int a = reg.a();
+        int v = a - i;
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(true);
+        reg.halfcarry(isHalfCarry(a, -i)); //WATCH THIS
+        reg.carry(isCarry(v));
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Subtract memory at HL + Carry flag from register A
+    Op SBC_A_HL = new Op(0x9E, "SBC A,(HL)", map, () -> {
+        int n = mmu.rb(reg.hl()); //Change me
+        int c = (reg.carry() ? 1 : 0);
+        int i = c + n;
+        int a = reg.a();
+        int v = a - i;
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(true);
+        reg.halfcarry(isHalfCarry(a, -i)); //WATCH THIS
+        reg.carry(isCarry(v));
+        
+        clock.m(2);
+        clock.t(8);
+    });
+    
+    //Subtract immediate value n + Carry flag from register A
+    Op SBC_A_n = new Op(0xDE, "SBC A,n", map, () -> {
+        int n = mmu.rb(reg.pc()); //Change me
+        int c = (reg.carry() ? 1 : 0);
+        int i = c + n;
+        int a = reg.a();
+        int v = a - i;
+        reg.a(v);
+        reg.pcpp(1);
+        
+        reg.zero(isZero(v));
+        reg.subtract(true);
+        reg.halfcarry(isHalfCarry(a, -i)); //WATCH THIS
+        reg.carry(isCarry(v));
+        
+        clock.m(2);
+        clock.t(8);
+    });
+    
+    //Logically and register A with register A, result in A
+    Op AND_A_A = new Op(0xA7, "AND A,A", map, () -> {
+        int n = reg.a();
+        int a = reg.a();
+        int v = a & n;
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(true);
+        reg.carry(false);
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Logically and register A with register B, result in A
+    Op AND_A_B = new Op(0xA0, "AND A,B", map, () -> {
+        int n = reg.b();
+        int a = reg.a();
+        int v = a & n;
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(true);
+        reg.carry(false);
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Logically and register A with register C, result in A
+    Op AND_A_C = new Op(0xA1, "AND A,C", map, () -> {
+        int n = reg.c();
+        int a = reg.a();
+        int v = a & n;
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(true);
+        reg.carry(false);
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Logically and register A with register D, result in A
+    Op AND_A_D = new Op(0xA2, "AND A,D", map, () -> {
+        int n = reg.d();
+        int a = reg.a();
+        int v = a & n;
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(true);
+        reg.carry(false);
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Logically and register A with register E, result in A
+    Op AND_A_E = new Op(0xA3, "AND A,E", map, () -> {
+        int n = reg.e();
+        int a = reg.a();
+        int v = a & n;
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(true);
+        reg.carry(false);
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Logically and register A with register H, result in A
+    Op AND_A_H = new Op(0xA4, "AND A,H", map, () -> {
+        int n = reg.h();
+        int a = reg.a();
+        int v = a & n;
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(true);
+        reg.carry(false);
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Logically and register A with register L, result in A
+    Op AND_A_L = new Op(0xA5, "AND A,L", map, () -> {
+        int n = reg.l();
+        int a = reg.a();
+        int v = a & n;
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(true);
+        reg.carry(false);
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Logically and register A with memory at HL, result in A
+    Op AND_A_HL = new Op(0xA6, "AND A,(HL)", map, () -> {
+        int n = mmu.rb(reg.hl());
+        int a = reg.a();
+        int v = a & n;
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(true);
+        reg.carry(false);
+        
+        clock.m(2);
+        clock.t(8);
+    });
+    
+    //Logically and register A with immediate value n, result in A
+    Op AND_A_n = new Op(0xE6, "AND A,n", map, () -> {
+        int n = mmu.rb(reg.pc());
+        int a = reg.a();
+        int v = a & n;
+        reg.a(v);
+        reg.pcpp(1);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(true);
+        reg.carry(false);
+        
+        clock.m(2);
+        clock.t(8);
+    });
+    
+    //Logically or register A with register A, result in A
+    Op OR_A_A = new Op(0xB7, "OR A,A", map, () -> {
+        int n = reg.a();
+        int a = reg.a();
+        int v = a | n;
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(false);
+        reg.carry(false);
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Logically or register A with register B, result in A
+    Op OR_A_B = new Op(0xB0, "OR A,B", map, () -> {
+        int n = reg.b();
+        int a = reg.a();
+        int v = a | n;
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(false);
+        reg.carry(false);
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Logically or register A with register C, result in A
+    Op OR_A_C = new Op(0xB1, "OR A,C", map, () -> {
+        int n = reg.c();
+        int a = reg.a();
+        int v = a | n;
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(false);
+        reg.carry(false);
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Logically or register A with register D, result in A
+    Op OR_A_D = new Op(0xB2, "OR A,D", map, () -> {
+        int n = reg.d();
+        int a = reg.a();
+        int v = a | n;
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(false);
+        reg.carry(false);
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Logically or register A with register E, result in A
+    Op OR_A_E = new Op(0xB3, "OR A,E", map, () -> {
+        int n = reg.e();
+        int a = reg.a();
+        int v = a | n;
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(false);
+        reg.carry(false);
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Logically or register A with register H, result in A
+    Op OR_A_H = new Op(0xB4, "OR A,H", map, () -> {
+        int n = reg.h();
+        int a = reg.a();
+        int v = a | n;
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(false);
+        reg.carry(false);
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Logically or register A with register L, result in A
+    Op OR_A_L = new Op(0xB5, "OR A,L", map, () -> {
+        int n = reg.l();
+        int a = reg.a();
+        int v = a | n;
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(false);
+        reg.carry(false);
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Logically or register A with memory at HL, result in A
+    Op OR_A_HL = new Op(0xB6, "OR A,(HL)", map, () -> {
+        int n = mmu.rb(reg.hl());
+        int a = reg.a();
+        int v = a | n;
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(false);
+        reg.carry(false);
+        
+        clock.m(2);
+        clock.t(8);
+    });
+    
+    //Logically or register A with immediate value n, result in A
+    Op OR_A_n = new Op(0xF6, "OR A,n", map, () -> {
+        int n = mmu.rb(reg.pc());
+        int a = reg.a();
+        int v = a | n;
+        reg.a(v);
+        reg.pcpp(1);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(false);
+        reg.carry(false);
+        
+        clock.m(2);
+        clock.t(8);
+    });
+    
+    //Logically exclusive or register A with register A, result in A
+    Op XOR_A_A = new Op(0xAF, "XOR A,A", map, () -> {
+        int n = reg.a();
+        int a = reg.a();
+        int v = a ^ n;
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(false);
+        reg.carry(false);
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Logically exclusive or register A with register B, result in A
+    Op XOR_A_B = new Op(0xA8, "XOR A,B", map, () -> {
+        int n = reg.b();
+        int a = reg.a();
+        int v = a ^ n;
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(false);
+        reg.carry(false);
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Logically exclusive or register A with register C, result in A
+    Op XOR_A_C = new Op(0xA9, "XOR A,C", map, () -> {
+        int n = reg.c();
+        int a = reg.a();
+        int v = a ^ n;
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(false);
+        reg.carry(false);
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Logically exclusive or register A with register D, result in A
+    Op XOR_A_D = new Op(0xAA, "XOR A,D", map, () -> {
+        int n = reg.d();
+        int a = reg.a();
+        int v = a ^ n;
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(false);
+        reg.carry(false);
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Logically exclusive or register A with register E, result in A
+    Op XOR_A_E = new Op(0xAB, "XOR A,E", map, () -> {
+        int n = reg.e();
+        int a = reg.a();
+        int v = a ^ n;
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(false);
+        reg.carry(false);
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Logically exclusive or register A with register H, result in A
+    Op XOR_A_H = new Op(0xAC, "XOR A,H", map, () -> {
+        int n = reg.h();
+        int a = reg.a();
+        int v = a ^ n;
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(false);
+        reg.carry(false);
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Logically exclusive or register A with register L, result in A
+    Op XOR_A_L = new Op(0xAD, "XOR A,L", map, () -> {
+        int n = reg.l();
+        int a = reg.a();
+        int v = a ^ n;
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(false);
+        reg.carry(false);
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Logically exclusive or register A with memory at HL, result in A
+    Op XOR_A_HL = new Op(0xAE, "XOR A,(HL)", map, () -> {
+        int n = mmu.rb(reg.hl());
+        int a = reg.a();
+        int v = a ^ n;
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(false);
+        reg.carry(false);
+        
+        clock.m(2);
+        clock.t(8);
+    });
+    
+    //Logically exclusive or register A with immedate value n, result in A
+    Op XOR_A_n = new Op(0xEE, "XOR A,n", map, () -> {
+        int n = mmu.rb(reg.pc());
+        int a = reg.a();
+        int v = a ^ n;
+        reg.a(v);
+        reg.pcpp(1);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(false);
+        reg.carry(false);
+        
+        clock.m(2);
+        clock.t(8);
+    });
+    
+    //Compare register A with register A
+    Op CP_A_A = new Op(0xBF, "CP A,A", map, () -> {
+        int n = reg.a();
+        int a = reg.a();
+            
+        reg.zero((n & Metrics.BIT8) == (a & Metrics.BIT8));
+        reg.subtract(true);
+        reg.halfcarry(isHalfCarry(a, -n));
+        reg.carry((a & Metrics.BIT8) < (n & Metrics.BIT8));
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Compare register A with register B
+    Op CP_A_B = new Op(0xB8, "CP A,B", map, () -> {
+        int n = reg.b();
+        int a = reg.a();
+            
+        reg.zero((n & Metrics.BIT8) == (a & Metrics.BIT8));
+        reg.subtract(true);
+        reg.halfcarry(isHalfCarry(a, -n));
+        reg.carry((a & Metrics.BIT8) < (n & Metrics.BIT8));
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Compare register A with register C
+    Op CP_A_C = new Op(0xB9, "CP A,C", map, () -> {
+        int n = reg.c();
+        int a = reg.a();
+            
+        reg.zero((n & Metrics.BIT8) == (a & Metrics.BIT8));
+        reg.subtract(true);
+        reg.halfcarry(isHalfCarry(a, -n));
+        reg.carry((a & Metrics.BIT8) < (n & Metrics.BIT8));
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Compare register A with register D
+    Op CP_A_D = new Op(0xBA, "CP A,D", map, () -> {
+        int n = reg.d();
+        int a = reg.a();
+            
+        reg.zero((n & Metrics.BIT8) == (a & Metrics.BIT8));
+        reg.subtract(true);
+        reg.halfcarry(isHalfCarry(a, -n));
+        reg.carry((a & Metrics.BIT8) < (n & Metrics.BIT8));
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Compare register A with register E
+    Op CP_A_E = new Op(0xBB, "CP A,E", map, () -> {
+        int n = reg.e();
+        int a = reg.a();
+            
+        reg.zero((n & Metrics.BIT8) == (a & Metrics.BIT8));
+        reg.subtract(true);
+        reg.halfcarry(isHalfCarry(a, -n));
+        reg.carry((a & Metrics.BIT8) < (n & Metrics.BIT8));
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Compare register A with register H
+    Op CP_A_H = new Op(0xBC, "CP A,H", map, () -> {
+        int n = reg.h();
+        int a = reg.a();
+            
+        reg.zero((n & Metrics.BIT8) == (a & Metrics.BIT8));
+        reg.subtract(true);
+        reg.halfcarry(isHalfCarry(a, -n));
+        reg.carry((a & Metrics.BIT8) < (n & Metrics.BIT8));
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Compare register A with register L
+    Op CP_A_L = new Op(0xBD, "CP A,L", map, () -> {
+        int n = reg.l();
+        int a = reg.a();
+            
+        reg.zero((n & Metrics.BIT8) == (a & Metrics.BIT8));
+        reg.subtract(true);
+        reg.halfcarry(isHalfCarry(a, -n));
+        reg.carry((a & Metrics.BIT8) < (n & Metrics.BIT8));
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Compare register A with memory at HL
+    Op CP_A_HL = new Op(0xBE, "CP A,(HL)", map, () -> {
+        int n = mmu.rb(reg.hl());
+        int a = reg.a();
+            
+        reg.zero((n & Metrics.BIT8) == (a & Metrics.BIT8));
+        reg.subtract(true);
+        reg.halfcarry(isHalfCarry(a, -n));
+        reg.carry((a & Metrics.BIT8) < (n & Metrics.BIT8));
+        
+        clock.m(2);
+        clock.t(8);
+    });
+    
+    //Compare register A with immediate value n
+    Op CP_A_n = new Op(0xFE, "CP A,n", map, () -> {
+        int n = mmu.rb(reg.pc());
+        int a = reg.a();
+        reg.pcpp(1);    
+        
+        reg.zero((n & Metrics.BIT8) == (a & Metrics.BIT8));
+        reg.subtract(true);
+        reg.halfcarry(isHalfCarry(a, -n));
+        reg.carry((a & Metrics.BIT8) < (n & Metrics.BIT8));
+        
+        clock.m(2);
+        clock.t(8);
+    });
+    
+    //Increment register A
+    Op INC_A = new Op(0x3C, "INC A", map, () -> {
+        int n = reg.a();
+        int v = n + 1;
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(isHalfCarry(n, 1));
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Increment register B
+    Op INC_B = new Op(0x04, "INC B", map, () -> {
+        int n = reg.b();
+        int v = n + 1;
+        reg.b(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(isHalfCarry(n, 1));
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Increment register C
+    Op INC_C = new Op(0x0C, "INC C", map, () -> {
+        int n = reg.c();
+        int v = n + 1;
+        reg.c(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(isHalfCarry(n, 1));
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Increment register D
+    Op INC_D = new Op(0x14, "INC D", map, () -> {
+        int n = reg.d();
+        int v = n + 1;
+        reg.d(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(isHalfCarry(n, 1));
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Increment register E
+    Op INC_E = new Op(0x1C, "INC E", map, () -> {
+        int n = reg.e();
+        int v = n + 1;
+        reg.e(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(isHalfCarry(n, 1));
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Increment register H
+    Op INC_H = new Op(0x24, "INC H", map, () -> {
+        int n = reg.h();
+        int v = n + 1;
+        reg.h(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(isHalfCarry(n, 1));
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Increment register L
+    Op INC_L = new Op(0x2C, "INC L", map, () -> {
+        int n = reg.l();
+        int v = n + 1;
+        reg.l(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(isHalfCarry(n, 1));
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Increment memory at HL
+    Op INC_HL = new Op(0x34, "INC (HL)", map, () -> {
+        int n = mmu.rb(reg.hl());
+        int v = n + 1;
+        mmu.wb(reg.hl(), v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(isHalfCarry(n, 1));
+        
+        clock.m(3);
+        clock.t(12);
+    });
+    
+    //Decrement register A
+    Op DEC_A = new Op(0x3D, "DEC A", map, () -> {
+        int n = reg.a();
+        int v = n - 1;
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(true);
+        reg.halfcarry(isHalfCarry(n, -1));
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Decrement register B
+    Op DEC_B = new Op(0x05, "DEC B", map, () -> {
+        int n = reg.b();
+        int v = n - 1;
+        reg.b(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(true);
+        reg.halfcarry(isHalfCarry(n, -1));
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Decrement register C
+    Op DEC_C = new Op(0x0D, "DEC C", map, () -> {
+        int n = reg.c();
+        int v = n - 1;
+        reg.c(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(true);
+        reg.halfcarry(isHalfCarry(n, -1));
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Decrement register D
+    Op DEC_D = new Op(0x15, "DEC D", map, () -> {
+        int n = reg.d();
+        int v = n - 1;
+        reg.d(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(true);
+        reg.halfcarry(isHalfCarry(n, -1));
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Decrement register E
+    Op DEC_E = new Op(0x1D, "DEC E", map, () -> {
+        int n = reg.e();
+        int v = n - 1;
+        reg.e(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(true);
+        reg.halfcarry(isHalfCarry(n, -1));
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Decrement register H
+    Op DEC_H = new Op(0x25, "DEC H", map, () -> {
+        int n = reg.h();
+        int v = n - 1;
+        reg.h(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(true);
+        reg.halfcarry(isHalfCarry(n, -1));
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Decrement register L
+    Op DEC_L = new Op(0x2D, "DEC L", map, () -> {
+        int n = reg.l();
+        int v = n - 1;
+        reg.l(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(true);
+        reg.halfcarry(isHalfCarry(n, -1));
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Decrement memory at HL
+    Op DEC_HL = new Op(0x35, "DEC (HL)", map, () -> {
+        int n = mmu.rb(reg.hl());
+        int v = n - 1;
+        mmu.wb(reg.hl(), v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(true);
+        reg.halfcarry(isHalfCarry(n, -1));
+        
+        clock.m(3);
+        clock.t(12);
+    });
+    
+    //PAGE 90
+    
+    ///
+    // 16 Bit ALU
+    ///
+    
+    //Add to register HL the register BC
+    Op ADD_HL_BC = new Op(0x09, "ADD HL,BC", map, () -> {
+        int n = reg.bc();
+        int hl = reg.hl();
+        int v = hl + n;
+        reg.hl(v);
+        
+        reg.subtract(false);
+        reg.halfcarry(isHalfCarry16(hl, n));
+        reg.carry(isCarry16(v));
+        
+        clock.m(2);
+        clock.t(8);
+    });
+    
+    //Add to register HL the register DE
+    Op ADD_HL_DE = new Op(0x19, "ADD HL,DE", map, () -> {
+        int n = reg.de();
+        int hl = reg.hl();
+        int v = hl + n;
+        reg.hl(v);
+        
+        reg.subtract(false);
+        reg.halfcarry(isHalfCarry16(hl, n));
+        reg.carry(isCarry16(v));
+        
+        clock.m(2);
+        clock.t(8);
+    });
+    
+    //Add to register HL the register HL
+    Op ADD_HL_HL = new Op(0x29, "ADD HL,HL", map, () -> {
+        int n = reg.hl();
+        int hl = reg.hl();
+        int v = hl + n;
+        reg.hl(v);
+        
+        reg.subtract(false);
+        reg.halfcarry(isHalfCarry16(hl, n));
+        reg.carry(isCarry16(v));
+        
+        clock.m(2);
+        clock.t(8);
+    });
+    
+    //Add to register HL the register SP
+    Op ADD_HL_SP = new Op(0x39, "ADD HL,SP", map, () -> {
+        int n = reg.sp();
+        int hl = reg.hl();
+        int v = hl + n;
+        reg.hl(v);
+        
+        reg.subtract(false);
+        reg.halfcarry(isHalfCarry16(hl, n));
+        reg.carry(isCarry16(v));
+        
+        clock.m(2);
+        clock.t(8);
+    });
+    
+    //Add to register SP the signed immediate value n
+    Op ADD_SP_n = new Op(0xE8, "ADD SP,n", map, () -> {
+        int n = mmu.rb(reg.pc());
+        if(n > 127)
+            n = -((~n+1)&255);
+        int sp = reg.sp();
+        int v = sp + n;
+        reg.sp(v);
+        reg.pcpp(1);
+        
+        reg.zero(false);
+        reg.subtract(false);
+        reg.halfcarry(isHalfCarry16(sp, n));
+        reg.carry(isCarry16(v));
+        
+        clock.m(4);
+        clock.t(16);
+    });
+    
+    //Increment the register BC
+    Op INC_BC = new Op(0x03, "INC BC", map, () -> {
+        int v = reg.bc() + 1;
+        reg.bc(v);
+        
+        clock.m(2);
+        clock.t(8);
+    });
+    
+    //Increment the register DE
+    Op INC_DE = new Op(0x13, "INC DE", map, () -> {
+        int v = reg.de() + 1;
+        reg.de(v);
+        
+        clock.m(2);
+        clock.t(8);
+    });
+    
+    //Increment the register HL
+    Op INC_rHL = new Op(0x23, "INC HL", map, () -> {
+        int v = reg.hl() + 1;
+        reg.hl(v);
+        
+        clock.m(2);
+        clock.t(8);
+    });
+    
+    //Increment the register SP
+    Op INC_SP = new Op(0x33, "INC SP", map, () -> {
+        int v = reg.sp() + 1;
+        reg.sp(v);
+        
+        clock.m(2);
+        clock.t(8);
+    });
+    
+    //Decrement the register BC
+    Op DEC_BC = new Op(0x0B, "DEC BC", map, () -> {
+        int v = reg.bc() - 1;
+        reg.bc(v);
+        
+        clock.m(2);
+        clock.t(8);
+    });
+    
+    //Decrement the register DE
+    Op DEC_DE = new Op(0x1B, "DEC DE", map, () -> {
+        int v = reg.de() - 1;
+        reg.de(v);
+        
+        clock.m(2);
+        clock.t(8);
+    });
+    
+    //Decrement the register BC
+    Op DEC_rHL = new Op(0x2B, "DEC HL", map, () -> {
+        int v = reg.hl() - 1;
+        reg.hl(v);
+        
+        clock.m(2);
+        clock.t(8);
+    });
+    
+    //Decrement the register SP
+    Op DEC_SP = new Op(0x3B, "DEC SP", map, () -> {
+        int v = reg.sp() - 1;
+        reg.sp(v);
+        
+        clock.m(2);
+        clock.t(8);
+    });
+    
+    ///
+    // Miscellaneous Operations
+    ///
+    
+    //Swap the upper and lower nibbles of register A
+    Op SWAP_A = new Op(0x37, "SWAP A", cbmap, () -> {
+        int t = reg.a();
+        int v = ((t&0x0F) << 4) | ((t&0xF0) >> 4);
+        reg.a(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(false);
+        reg.carry(false);
+        
+        clock.m(2);
+        clock.t(8);
+    });
+    
+    //Swap the upper and lower nibbles of register B
+    Op SWAP_B = new Op(0x30, "SWAP B", cbmap, () -> {
+        int t = reg.b();
+        int v = ((t&0x0F) << 4) | ((t&0xF0) >> 4);
+        reg.b(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(false);
+        reg.carry(false);
+        
+        clock.m(2);
+        clock.t(8);
+    });
+    
+    //Swap the upper and lower nibbles of register C
+    Op SWAP_C = new Op(0x31, "SWAP C", cbmap, () -> {
+        int t = reg.c();
+        int v = ((t&0x0F) << 4) | ((t&0xF0) >> 4);
+        reg.c(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(false);
+        reg.carry(false);
+        
+        clock.m(2);
+        clock.t(8);
+    });
+    
+    //Swap the upper and lower nibbles of register D
+    Op SWAP_D = new Op(0x32, "SWAP D", cbmap, () -> {
+        int t = reg.d();
+        int v = ((t&0x0F) << 4) | ((t&0xF0) >> 4);
+        reg.d(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(false);
+        reg.carry(false);
+        
+        clock.m(2);
+        clock.t(8);
+    });
+    
+    //Swap the upper and lower nibbles of register E
+    Op SWAP_E = new Op(0x33, "SWAP E", cbmap, () -> {
+        int t = reg.e();
+        int v = ((t&0x0F) << 4) | ((t&0xF0) >> 4);
+        reg.e(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(false);
+        reg.carry(false);
+        
+        clock.m(2);
+        clock.t(8);
+    });
+    
+    //Swap the upper and lower nibbles of register H
+    Op SWAP_H = new Op(0x34, "SWAP H", cbmap, () -> {
+        int t = reg.h();
+        int v = ((t&0x0F) << 4) | ((t&0xF0) >> 4);
+        reg.h(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(false);
+        reg.carry(false);
+        
+        clock.m(2);
+        clock.t(8);
+    });
+    
+    //Swap the upper and lower nibbles of register L
+    Op SWAP_L = new Op(0x35, "SWAP L", cbmap, () -> {
+        int t = reg.l();
+        int v = ((t&0x0F) << 4) | ((t&0xF0) >> 4);
+        reg.l(v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(false);
+        reg.carry(false);
+        
+        clock.m(2);
+        clock.t(8);
+    });
+    
+    //Swap the upper and lower nibbles of memory at HL
+    Op SWAP_HL = new Op(0x36, "SWAP (HL)", cbmap, () -> {
+        int t = mmu.rb(reg.hl());
+        int v = ((t&0x0F) << 4) | ((t&0xF0) >> 4);
+        mmu.wb(reg.hl(), v);
+        
+        reg.zero(isZero(v));
+        reg.subtract(false);
+        reg.halfcarry(false);
+        reg.carry(false);
+        
+        clock.m(2);
+        clock.t(8);
+    });
+    
+    //Adjust register A so that the correct represnetation of a binary coded decimal is obtained
+    Op DAA = new Op(0x27, "DAA", map, () -> {
+        //TODO wtf is this
+        int a = reg.a();
+        if(reg.halfcarry() || (reg.a() & 15) > 9)
+            reg.a(reg.a() + 6);
+        reg.carry(false);
+        if(reg.halfcarry() || a > 0x99){
+            reg.a(reg.a() + 0x60);
+            reg.carry(true);
+        }
+        
+        reg.zero(isZero(reg.a()));
+        reg.halfcarry(false);
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Compement the A register
+    Op CPL = new Op(0x2F, "CPL", map, () -> {
+        int a = reg.a() ^ 255;
+        reg.a(a);
+        
+        reg.subtract(true);
+        reg.halfcarry(true);
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //If carry flag is set, reset it. If flag is reset, set it
+    Op CCF = new Op(0x3F, "CCF", map, () -> {
+        reg.carry(!reg.carry());
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Set the carry flag
+    Op SCF = new Op(0x37, "SCF", map, () -> {
+        reg.carry(true);
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Power down the CPU
+    Op HALT = new Op(0x76, "HALT", map, () -> {
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Disables interrupts
+    Op DI = new Op(0xF3, "DI", map, () -> {
+        //TODO
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Enabled interrupts
+    Op EI = new Op(0xFB, "EI", map, () -> {
+        //TODO
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    ///
+    // Rotates and Shifts
+    ///
+    
+    //Rotate A left, old bit 7 to Carry flag
+    Op RLCA = new Op(0x07, "RCLA", map, () -> {
+        int a = reg.a();
+        boolean carry = ((a & 0x80) != 0);
+        a = (a << 1) + (carry ? 1: 0);
+        reg.a(a);
+        
+        reg.zero(isZero(a));
+        reg.subtract(false);
+        reg.halfcarry(false);
+        reg.carry(carry);
+
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Rotate A left through carry flag 
+    Op RLA = new Op(0x17, "RLA", map, () -> {
+        int a = reg.a();
+        boolean carry = ((a & 0x80) != 0);
+        a = (a << 1) + (reg.carry() ? 1 : 0);
+        reg.a(a);
+        
+        reg.zero(isZero(a));
+        reg.subtract(false);
+        reg.halfcarry(false);
+        reg.carry(carry);
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Rotate A right, old bit 0 to carry flag
+    Op RRCA = new Op(0x0F, "RRCA", map, () -> {
+        int a = reg.a();
+        boolean toCarry = ((a & 0b1) != 0);
+        a = (a >> 1) + (toCarry ? 0x80 : 0);
+        reg.a(a);
+        
+        reg.zero(isZero(a));
+        reg.subtract(false);
+        reg.halfcarry(false);
+        reg.carry(toCarry);
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Rotate A right though the carry flag, old bit 0 to carry flag
+    Op RRA = new Op(0x1F, "RRA", map, () -> {
+        int a = reg.a();
+        boolean toCarry = ((a & 0b1) != 0);
+        a = (a >> 1) + (reg.carry() ? 0x80 : 0);
+        reg.a(a);
+        
+        reg.zero(isZero(a));
+        reg.subtract(false);
+        reg.halfcarry(false);
+        reg.carry(toCarry);
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //TODO PAGE 101
+    
+    
+    ///
+    // Jumps
+    ///
+    
+    //Jump to immediate address nn
+    Op JP_nn = new Op(0xC3, "JP nn", map, () -> {
+        int nn = mmu.rw(reg.pc());
+        reg.pc(nn);
+        
+        clock.m(3);
+        clock.t(12);
+    });
+    
+    //Jump to address nn if Z flag is reset
+    Op JP_NZ_nn = new Op(0xC2, "JP NZ,nn", map, () -> {
+        int nn = mmu.rw(reg.pc());
+        
+        if(!reg.zero()){
+            reg.pc(nn); //Maybe clock.m++;
+        }else
+            reg.pcpp(2);
+        
+        clock.m(3);
+        clock.t(12);
+    });
+    
+    //Jump to address nn if Z flag is set
+    Op JP_Z_nn = new Op(0xCA, "JP Z,nn", map, () -> {
+        int nn = mmu.rw(reg.pc());
+        
+        if(reg.zero()){
+            reg.pc(nn); //Maybe clock.m++;
+        }else
+            reg.pcpp(2);
+        
+        clock.m(3);
+        clock.t(12);
+    });
+    
+    //Jump to address nn if Carry flag is reset
+    Op JP_NC_nn = new Op(0xD2, "JP NC,nn", map, () -> {
+        int nn = mmu.rw(reg.pc());
+        
+        if(!reg.carry()){
+            reg.pc(nn); //Maybe clock.m++;
+        }else
+            reg.pcpp(2);
+        
+        clock.m(3);
+        clock.t(12);
+    });
+    
+    //Jump to address nn if Carry flag is set
+    Op JP_C_nn = new Op(0xDA, "JP C,nn", map, () -> {
+        int nn = mmu.rw(reg.pc());
+        
+        if(reg.carry()){
+            reg.pc(nn); //Maybe clock.m++;
+        }else
+            reg.pcpp(2);
+        
+        clock.m(3);
+        clock.t(12);
+    });
+    
+    //Jump to address in HL
+    Op JP_NL = new Op(0xE9, "JP HL", map, () -> {
+        reg.pc(reg.hl());
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Add signed value n to the current address and jump to it
+    Op JP_n = new Op(0x18, "JR n", map, () -> {
+        int n = mmu.rb(reg.pc());
+        reg.pcpp(1);
+        if(n > 127)
+            n = -((~n+1)&255);
+        int a = reg.pc() + n;
+        reg.pc(a);
+        
+        clock.m(2);
+        clock.t(8);
+    });
+    
+    //Jump to pc + signed n if Z flag is reset
+    Op JP_NZ_n = new Op(0x20, "JR NZ,n", map, () -> {
+        int i = mmu.rb(reg.pc());
+        if(i > 127)
+            i = -((~i+1)&255);
+        reg.pcpp(1);
+        
+        if(!reg.zero()){
+            reg.pc(reg.pc() + i);
+        }
+        
+        clock.m(2);
+        clock.t(8);
+    });
+    
+    //Jump to pc + signed n if Z flag is set
+    Op JP_Z_n = new Op(0x28, "JR Z,n", map, () -> {
+        int i = mmu.rb(reg.pc());
+        if(i > 127)
+            i = -((~i+1)&255);
+        reg.pcpp(1);
+        
+        if(reg.zero()){
+            reg.pc(reg.pc() + i);
+        }
+        
+        clock.m(2);
+        clock.t(8);
+    });
+    
+    //Jump to pc + signed n if C flag is reset
+    Op JP_NC_n = new Op(0x30, "JR NC,n", map, () -> {
+        int i = mmu.rb(reg.pc());
+        if(i > 127)
+            i = -((~i+1)&255);
+        reg.pcpp(1);
+        
+        if(!reg.carry()){
+            reg.pc(reg.pc() + i);
+        }
+        
+        clock.m(2);
+        clock.t(8);
+    });
+    
+    //Jump to pc + signed n if C flag is reset
+    Op JP_C_n = new Op(0x38, "JR C,n", map, () -> {
+        int i = mmu.rb(reg.pc());
+        if(i > 127)
+            i = -((~i+1)&255);
+        reg.pcpp(1);
+        
+        if(reg.carry()){
+            reg.pc(reg.pc() + i);
+        }
+        
+        clock.m(2);
+        clock.t(8);
+    });
+    
+    //PAGE 114
+    
+    ///
+    // Calls
+    //
+    
+    //Push next instruction onto stack and jump to address nn
+    Op CALL_nn = new Op(0xCD, "CALL nn", map, () -> {
+        //Next inst to stack
+        reg.sppp(-2);
+        int next = reg.pc() + 2;
+        mmu.wb(reg.sp(), next);
+        
+        //Jump to immediate value
+        int jp = mmu.rw(reg.pc());
+        reg.pc(jp);
+        
+        clock.m(3);
+        clock.t(12);
+    });
+    
+    //Call address n if the condtion is true
+    Op CALL_NZ_nn = new Op(0xC4, "CALL NZ,nn", map, () -> {
+        if(!reg.zero()){
+             //Next inst to stack
+            reg.sppp(-2);
+            int next = reg.pc() + 2;
+            mmu.wb(reg.sp(), next);
+            
+            //Jump to immediate value
+            int jp = mmu.rw(reg.pc());
+            reg.pc(jp);
+        }else{
+            reg.pcpp(2);
+        }
+        
+        clock.m(3);
+        clock.t(12);
+    });
+    
+    //Call address n if the condtion is true
+    Op CALL_Z_nn = new Op(0xCC, "CALL Z,nn", map, () -> {
+        if(reg.zero()){
+             //Next inst to stack
+            reg.sppp(-2);
+            int next = reg.pc() + 2;
+            mmu.wb(reg.sp(), next);
+            
+            //Jump to immediate value
+            int jp = mmu.rw(reg.pc());
+            reg.pc(jp);
+        }else{
+            reg.pcpp(2);
+        }
+        
+        clock.m(3);
+        clock.t(12);
+    });
+    
+    //Call address n if the condtion is true
+    Op CALL_NC_nn = new Op(0xD4, "CALL NC,nn", map, () -> {
+        if(!reg.carry()){
+             //Next inst to stack
+            reg.sppp(-2);
+            int next = reg.pc() + 2;
+            mmu.wb(reg.sp(), next);
+            
+            //Jump to immediate value
+            int jp = mmu.rw(reg.pc());
+            reg.pc(jp);
+        }else{
+            reg.pcpp(2);
+        }
+        
+        clock.m(3);
+        clock.t(12);
+    });
+    
+    //Call address n if the condtion is true
+    Op CALL_C_nn = new Op(0xDC, "CALL C,nn", map, () -> {
+        if(reg.carry()){
+             //Next inst to stack
+            reg.sppp(-2);
+            int next = reg.pc() + 2;
+            mmu.wb(reg.sp(), next);
+            
+            //Jump to immediate value
+            int jp = mmu.rw(reg.pc());
+            reg.pc(jp);
+        }else{
+            reg.pcpp(2);
+        }
+        
+        clock.m(3);
+        clock.t(12);
+    });
+    
+    //PAGE 116
+    
+    ///
+    // Restarts
+    ///
+    
+    //Push present address onto stack and jump to 0x0000 + n
+    Op RST_00h = new Op(0xC7, "RST 00H", map, () -> {
+        //reg.rsv(); //TODO //Save registry to backup
+        reg.sppp(-2);
+        mmu.wb(reg.sp(), reg.pc());
+        reg.pc(0x00);
+        
+        clock.m(8); //Maybe 3 and 12
+        clock.t(32);
+    });
+    
+    //Push present address onto stack and jump to 0x0000 + n
+    Op RST_08h = new Op(0xCF, "RST 08H", map, () -> {
+        //reg.rsv();
+        reg.sppp(-2);
+        mmu.wb(reg.sp(), reg.pc());
+        reg.pc(0x08);
+        
+        clock.m(8); //Maybe 3 and 12
+        clock.t(32);
+    });
+    
+    //Push present address onto stack and jump to 0x0000 + n
+    Op RST_10h = new Op(0xD7, "RST 10H", map, () -> {
+        //reg.rsv();
+        reg.sppp(-2);
+        mmu.wb(reg.sp(), reg.pc());
+        reg.pc(0x10);
+        
+        clock.m(8); //Maybe 3 and 12
+        clock.t(32);
+    });
+    
+    //Push present address onto stack and jump to 0x0000 + n
+    Op RST_18h = new Op(0xDF, "RST 18H", map, () -> {
+        //reg.rsv();
+        reg.sppp(-2);
+        mmu.wb(reg.sp(), reg.pc());
+        reg.pc(0x18);
+        
+        clock.m(8); //Maybe 3 and 12
+        clock.t(32);
+    });
+    
+    //Push present address onto stack and jump to 0x0000 + n
+    Op RST_20h = new Op(0xE7, "RST 20H", map, () -> {
+        //reg.rsv();
+        reg.sppp(-2);
+        mmu.wb(reg.sp(), reg.pc());
+        reg.pc(0x20);
+        
+        clock.m(8); //Maybe 3 and 12
+        clock.t(32);
+    });
+    
+    //Push present address onto stack and jump to 0x0000 + n
+    Op RST_28h = new Op(0xEF, "RST 28H", map, () -> {
+        //reg.rsv();
+        reg.sppp(-2);
+        mmu.wb(reg.sp(), reg.pc());
+        reg.pc(0x28);
+        
+        clock.m(8); //Maybe 3 and 12
+        clock.t(32);
+    });
+    
+    //Push present address onto stack and jump to 0x0000 + n
+    Op RST_30h = new Op(0xF7, "RST 30H", map, () -> {
+        //reg.rsv();
+        reg.sppp(-2);
+        mmu.wb(reg.sp(), reg.pc());
+        reg.pc(0x30);
+        
+        clock.m(8); //Maybe 3 and 12
+        clock.t(32);
+    });
+    
+    //Push present address onto stack and jump to 0x0000 + n
+    Op RST_38h = new Op(0xFF, "RST 38H", map, () -> {
+        //reg.rsv();
+        reg.sppp(-2);
+        mmu.wb(reg.sp(), reg.pc());
+        reg.pc(0x38);
+        
+        clock.m(8); //Maybe 3 and 12
+        clock.t(32);
+    });
+    
+    //PAGE 117
+    
+    ///
+    // Returns
+    ///
+    
+    //Pop 2 bytes off stack and jump to that address
+    Op RET = new Op(0xC9, "RET", map, () -> {
+        reg.pc(mmu.rw(reg.sp()));
+        reg.sppp(2);
+        
+        clock.m(2);
+        clock.t(8);
+    });
+    
+    //Return if Z flag is reset
+    Op RET_NZ = new Op(0xC0, "RET NZ", map, () -> {
+        if(!reg.zero()){
+            reg.pc(mmu.rw(reg.sp()));
+            reg.sppp(2);
+            clock.m(2);
+            clock.t(8);
+        }else{
+            clock.m(1);
+            clock.t(4);
+        }
+    });
+    
+    //Return if Z flag is set
+    Op RET_Z = new Op(0xC8, "RET Z", map, () -> {
+        if(reg.zero()){
+            reg.pc(mmu.rw(reg.sp()));
+            reg.sppp(2);
+            clock.m(2);
+            clock.t(8);
+        }else{
+            clock.m(1);
+            clock.t(4);
+        }
+    });
+    
+    //Return if C flag is reset
+    Op RET_CZ = new Op(0xD0, "RET CZ", map, () -> {
+        if(!reg.carry()){
+            reg.pc(mmu.rw(reg.sp()));
+            reg.sppp(2);
+            clock.m(2);
+            clock.t(8);
+        }else{
+            clock.m(1);
+            clock.t(4);
+        }
+    });
+    
+    //Return if C flag is set
+    Op RET_C = new Op(0xD8, "RET C", map, () -> {
+        if(reg.carry()){
+            reg.pc(mmu.rw(reg.sp()));
+            reg.sppp(2);
+            clock.m(2);
+            clock.t(8);
+        }else{
+            clock.m(1);
+            clock.t(4);
+        }
+    });
+    
+    //Pop 2 bytes off the stack, and jump there then enable interrupts
+    Op RETI = new Op(0xD9, "RETI", map, () -> {
+        //reg.rrs(); //Restore registry //TODO
+        EI.Invoke();
+        reg.pc(mmu.rw(reg.sp()));
+        reg.sppp(2);
+        
+        clock.m(1);
+        clock.t(4);
+    });
+    
+    //Use CB opcode
+    Op CB = new Op(0xCB, "CBOP", map, () -> {
+        int i = mmu.rb(reg.pc());
+        reg.pcpp(1);
+        if(i >= 0 && i < cbmap.length){
+            cbmap[i].Invoke();
+        }
+        else{
+            System.out.println("Trying to call CB-prefixed opcode out of range 0-255 ("+i+")");
+        }
+    });
 }

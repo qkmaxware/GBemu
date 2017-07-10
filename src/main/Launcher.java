@@ -5,13 +5,7 @@
  */
 package main;
 
-import gameboy.Cartridge;
-import gameboy.CartridgeFactory;
-import gameboy.Gameboy;
-import java.io.File;
-import java.io.FilenameFilter;
-import javax.swing.JButton;
-import utilities.Debugger;
+import java.awt.Dimension;
 
 /**
  *
@@ -20,36 +14,15 @@ import utilities.Debugger;
 public class Launcher {
     
     public static void main(String[] args){
-        Gameboy gb = new Gameboy();
-        Debugger reader = new Debugger(gb);
-        reader.setVisible(true);
         
-        Cartridge[] games = GetLocalCartridges();
-        gb.LoadCartridge(games[1]);
+        SwingGB window = new SwingGB();
+        window.setSize(new Dimension(300,360));
+        window.setVisible(true);
         
-        System.out.println(games[1]);
+        window.getDebugger().setVisible(true);
         
     }
     
-    public static Cartridge[] GetLocalCartridges(){
-        File dir = new File(".");
-        File[] files = dir.listFiles(new FilenameFilter() {
-            @Override
-            public boolean accept(File dir, String name) {
-                return name.endsWith(".gb");
-            }
-        });
-
-        Cartridge[] roms = new Cartridge[files.length];
-        
-        int i = 0;
-        for (File gbfile : files) {
-            Cartridge rom = CartridgeFactory.Load(gbfile.getAbsolutePath());
-            roms[i] = rom;
-            i++;
-        }
-        
-        return roms;
-    }
+    
     
 }

@@ -20,12 +20,14 @@ public class Op {
    private Action action;
    
    public Op(int hex, String name, Op[] mapping, Action action){
-       this.hex = hex;
-       this.name = name;
-       if(mapping[hex] != null) //For my sanity
-           System.out.println("Opcode "+name+" replacing "+mapping[hex].name+" at: "+String.format("0x%04X", hex));
-       mapping[hex] = this;
-       this.action = action;
+        this.hex = hex;
+        this.name = name;
+        if(mapping != null){
+            if(mapping[hex] != null) //For my sanity
+                System.out.println("Opcode "+name+" replacing "+mapping[hex].name+" at: "+String.format("0x%04X", hex));
+            mapping[hex] = this;
+        }
+        this.action = action;
    }
 
    public String toString(){

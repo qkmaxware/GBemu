@@ -32,7 +32,7 @@ public class Cartridge implements IMemory{
     }
     
     public String toString(){
-        return info.toString();
+        return info.title;
     }
     
     @Override
