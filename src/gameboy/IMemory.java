@@ -17,4 +17,6 @@ public interface IMemory {
     
     public void wb(int addr, int value);
     
+    public void SetMMU(MemoryMap mmu);
+    
 }

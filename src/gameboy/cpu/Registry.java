@@ -3,7 +3,9 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package gameboy;
+package gameboy.cpu;
+
+import gameboy.Metrics;
 
 /**
  *
@@ -16,17 +18,27 @@ public class Registry {
     private int flags;
     private int high, low;
     private int sp, pc;
-
+    private int ime;
+    
     //Manipulators --------------------------------------------------------
     public void Reset(){
         a = 0; b = 0; c = 0; d = 0; e = 0;
         flags = 0;
         high = 0; low = 0;
         sp = 0; pc = 0;
+        ime = 0;
     }
     
     //Accessors -----------------------------------------------------------
     //8BIT ----------------------------------------------------------------
+    public int ime(){
+        return ime;
+    }
+    
+    public void ime(int i){
+        ime = i & Metrics.BIT8;
+    }
+    
     public int a() {
         return a;
     }

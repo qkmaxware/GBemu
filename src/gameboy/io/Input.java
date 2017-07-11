@@ -3,8 +3,10 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package gameboy;
+package gameboy.io;
 
+import gameboy.IMemory;
+import gameboy.MemoryMap;
 import java.awt.event.KeyEvent;
 import java.util.Arrays;
 
@@ -16,6 +18,7 @@ public class Input implements IMemory{
     
     private int[] rows = new int[]{0x0F, 0x0F};
     private int colidx = 0;
+    private Timer timer = new Timer();
     
     public enum Key{
         Up, Down, Left, Right, Select, Start, A, B
@@ -32,6 +35,7 @@ public class Input implements IMemory{
     
     public void Reset(){
         Arrays.fill(rows, 0x0F);
+        timer.Reset();
         colidx = 0;
     }
     
@@ -121,17 +125,23 @@ public class Input implements IMemory{
     }
     
     public int rb(int addr){
-        switch(colidx){
-            case 0x10:
-                return rows[0];
-            case 0x20:
-                return rows[1];
+        if(addr == 0xFF00){
+            switch(colidx){
+                case 0x10:
+                    return rows[0];
+                case 0x20:
+                    return rows[1];
+            }
         }
         return 0;
     }
     
     public void wb(int addr, int value){
-        colidx = value & 0x30;
+        if(addr == 0xFF00){
+            colidx = value & 0x30;
+        }
     }
 
+    public void SetMMU(MemoryMap mmu){}
+    
 }

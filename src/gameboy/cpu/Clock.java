@@ -3,7 +3,7 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package gameboy;
+package gameboy.cpu;
 
 /**
  *
@@ -13,8 +13,8 @@ public class Clock {
     
     private long machine; private long cycles; 
     
-    private long inst_cycle;
-    private long inst_machine;
+    private int inst_cycle;
+    private int inst_machine;
     
     public void Reset(){
         machine = 0;
@@ -29,7 +29,15 @@ public class Clock {
     }
     
     public void m(long i){
-        inst_machine = i;
+        inst_machine += i;
+    }
+    
+    public int delM(){
+        return this.inst_machine;
+    }
+    
+    public int delT(){
+        return this.inst_cycle;
     }
     
     public long t(){
@@ -37,7 +45,7 @@ public class Clock {
     }
     
     public void t(long i){
-       inst_cycle = i;
+       inst_cycle += i;
     }
     
     public void Accept(){

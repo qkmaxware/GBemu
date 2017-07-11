@@ -5,6 +5,13 @@
  */
 package gameboy;
 
+import gameboy.disk.HDD;
+import gameboy.io.Input;
+import gameboy.game.Cartridge;
+import gameboy.cpu.Cpu;
+import gameboy.gpu.Gpu;
+import gameboy.io.Timer;
+
 /**
  *
  * @author Colin
@@ -18,36 +25,45 @@ public class Gameboy {
     
     public Gameboy(){
         mmu = new MemoryMap();
-        
-        HDD disk = new HDD();
-        mmu.INTERNAL_RAM = disk;
-        mmu.ZRAM = disk;        
-        mmu.INTERUPT_REGISTER = disk;
-        
-        //TODO
+
+        HDD onboard = new HDD();
         gpu = new Gpu();
-        mmu.OAM = gpu;
-        mmu.VRAM = gpu;
-        
         input = new Input();
-        mmu.INPUT_OUTPUT = input;
+        Timer timer = new Timer();
+        
+        mmu.Set(MemoryMap.INTERNAL_RAM, onboard);
+        mmu.Set(MemoryMap.ZRAM, onboard);
+        
+        mmu.Set(MemoryMap.JOYSTICK, input);
+        mmu.Set(MemoryMap.TIMER, timer);
+        
+        mmu.Set(MemoryMap.OAM, gpu);
+        mmu.Set(MemoryMap.VRAM, gpu);
+        mmu.Set(MemoryMap.GPU, gpu);
+        
         
         cpu = new Cpu();
         cpu.SetMmu(mmu);
         
     }
     
+    public void Reset(){
+        mmu.Reset();
+        cpu.Reset();
+        gpu.Reset();
+    }
+    
     public void LoadCartridge(Cartridge cart){
-        mmu.ROM_BANK_0 = cart;
-        mmu.ROM_BANK_1 = cart;
-        mmu.EXTERNAL_RAM = cart;
+        mmu.Set(MemoryMap.ROM_BANK_0, cart);
+        mmu.Set(MemoryMap.ROM_BANK_1, cart);
+        mmu.Set(MemoryMap.EXTERNAL_RAM, cart);
     }
     
     private void Dispatch(){
         //Step the cpu
-        cpu.Step();
+        int deltaTime = cpu.Step();
         
         //Step the gpu
-        gpu.Step();
+        gpu.Step(deltaTime);
     }
 }

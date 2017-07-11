@@ -3,8 +3,10 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package gameboy;
+package gameboy.game;
 
+import gameboy.IMemory;
+import gameboy.MemoryMap;
 import java.util.Arrays;
 
 /**
@@ -62,10 +64,13 @@ public class Cartridge implements IMemory{
 
     @Override
     public void wb(int addr, int value) {
+        //TODO write byte to cause MBC changes
         if(in(addr, 0xA000, 0xBFFF)){
             //External cartridge RAM
             eram[ramoff + (addr&0x1FFF)] = value; //eram[ramoffs+(addr&0x1FFF)];
         }
     }
+    
+    public void SetMMU(MemoryMap mmu){}
     
 }

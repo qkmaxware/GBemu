@@ -9,7 +9,7 @@ package gameboy;
  *
  * @author Colin
  */
-public class MemoryMap implements IMemory{
+public class MemoryMap{
     
     //GB memory map is as follows
     //http://gbdev.gg8.se/wiki/articles/Main_Page
@@ -32,26 +32,26 @@ public class MemoryMap implements IMemory{
         0000 - 00FF     Restart and Interrupt Vectors
     */
     
-    public IMemory ROM_BANK_0;
-    public IMemory ROM_BANK_1;
-    public IMemory VRAM;
-    public IMemory EXTERNAL_RAM;
-    public IMemory INTERNAL_RAM;
-    public IMemory OAM;
-    public IMemory INPUT_OUTPUT;
-    public IMemory ZRAM;
-    public IMemory INTERUPT_REGISTER;
+    public static final int ROM_BANK_0 = 0;
+    public static final int ROM_BANK_1 = 1;
+    public static final int VRAM = 2;
+    public static final int EXTERNAL_RAM = 3;
+    public static final int INTERNAL_RAM = 4;
+    public static final int OAM = 5;
+    public static final int GPU = 6;
+    public static final int ZRAM = 7;
+    public static final int JOYSTICK = 9;
+    public static final int TIMER = 10;
+    
+    private IMemory[] ctrl = new IMemory[11];
+    private int interrupt_enable = 0;
+    private int interrupt_flags = 0;
     
     public void Reset(){
-        ROM_BANK_0.Reset();
-        ROM_BANK_1.Reset();
-        VRAM.Reset();
-        EXTERNAL_RAM.Reset();
-        INTERNAL_RAM.Reset();
-        OAM.Reset();
-        INPUT_OUTPUT.Reset();
-        ZRAM.Reset();
-        INTERUPT_REGISTER.Reset();
+        for(IMemory mem : ctrl){
+            if(mem != null)
+                mem.Reset();
+        }
     }
     
     private static boolean in(int x, int lower, int upper) {
@@ -63,88 +63,61 @@ public class MemoryMap implements IMemory{
     }
     
     public int rb(int addr){
-        if(in(addr, 0, 0x00FF)){
-            //Restart and Interrupt Vectors
-            if(ROM_BANK_0 == null)
-                return 0;
-            return ROM_BANK_0.rb(addr);
-        }
-        else if(in(addr, 0x0100, 0x014F)){
-            //Cartridge Header
-            if(ROM_BANK_0 == null)
-                return 0;
-            return ROM_BANK_0.rb(addr);
-        }
-        else if(in(addr, 0x0150, 0x3FFF)){
-            //Cartridge ROM (fixed)
-            if(ROM_BANK_0 == null)
-                return 0;
-            return ROM_BANK_0.rb(addr);
-        }
-        else if(in(addr, 0x4000, 0x7FFF)){
-            //Cartridge ROM (switchable)
-            if(ROM_BANK_1 == null)
-                return 0;
-            return ROM_BANK_1.rb(addr);
-        }
-        else if(in(addr, 0x8000, 0x9FFF)){
-            //Video RAM
-            if(VRAM == null)
-                return 0;
-            return VRAM.rb(addr);
-        }
-        else if(in(addr, 0xA000, 0xBFFF)){
-            //External Cartridge RAM
-            if(EXTERNAL_RAM == null)
-                return 0;
-            return EXTERNAL_RAM.rb(addr);
-        }
-        else if(in(addr, 0xC000, 0xCFFF)){
-            //Internal RAM (fixed)
-            if(INTERNAL_RAM == null)
-                return 0;
-            return INTERNAL_RAM.rb(addr);
-        }
-        else if(in(addr, 0xD000, 0xDFFF)){
-            //Internal RAM (switchable)
-            if(INTERNAL_RAM == null)
-                return 0;
-            return INTERNAL_RAM.rb(addr);
-        }
-        else if(in(addr, 0xE000, 0xFDFF)){
-            //Shadow Interal RAM
-            if(INTERNAL_RAM == null)
-                return 0;
-            return INTERNAL_RAM.rb(addr);
-        }
-        else if(in(addr, 0xFE00, 0xFE9F)){
-            //OAM (object attribute memory)
-            if(OAM == null)
-                return 0;
-            return OAM.rb(addr);
-        }
-        else if(in(addr, 0xFEA0, 0xFEFF)){
-            //Unusable Memory
-        }
-        else if(in(addr, 0xFF00, 0xFF7F)){
-            //Hardware IO Registers
-            if(INPUT_OUTPUT == null)
-                return 0;
-            return INPUT_OUTPUT.rb(addr);
-        }
-        else if(in(addr, 0xFF80, 0xFFFE)){
-            //Zero page
-            if(ZRAM == null)
-                return 0;
-            return ZRAM.rb(addr);
-        }
-        else if(addr == 0xFFFF){
-            //Interrupt Enable Flag
-            if(INTERUPT_REGISTER == null)
-                return 0;
-            return INTERUPT_REGISTER.rb(addr);
-        }
-        return 0;
+       if(in(addr, 0x0000, 0x3FFFF)){
+           //Rom Bank 0
+           return ctrl[ROM_BANK_0].rb(addr);
+       }
+       else if(in(addr, 0x4000, 0x7FFF)){
+           //Rom Bank 1
+           return ctrl[ROM_BANK_1].rb(addr);
+       }
+       else if(in(addr, 0x8000, 0x9FFF)){
+           //Video Ram
+           return ctrl[VRAM].rb(addr);
+       }
+       else if(in(addr, 0xA000, 0xBFFF)){
+           //Cartridge Ram
+           return ctrl[EXTERNAL_RAM].rb(addr);
+       }
+       else if(in(addr, 0xC000, 0xFDFF)){
+           //Work Ram and Shadow
+           return ctrl[INTERNAL_RAM].rb(addr);
+       }
+       else if(in(addr, 0xFE00, 0xFE9F)){
+           //Object Attribute Memory
+           return ctrl[OAM].rb(addr);
+       }
+       else if(in(addr, 0xFF80, 0xFFFE)){
+           //Zero Page Ram
+           return ctrl[ZRAM].rb(addr);
+       }
+       else if(addr == 0xFF00){
+           //Joystick input
+           return ctrl[JOYSTICK].rb(addr);
+       }
+       else if(in(addr, 0xFF01, 0xFF03)){
+           //Serial IO Data, Control, UNKNOWN
+           return 0;
+       }
+       else if(in(addr, 0xFF04, 0xFF0E)){
+           //Timer
+           return ctrl[TIMER].rb(addr);
+       }
+       else if(addr == 0xFF0F){
+           //Interrupt Flags
+           return interrupt_flags;
+       }
+       else if(in(addr, 0xFF10, 0xFF39)){
+           //Sound control, envelope ect
+           return 0;
+       }
+       else if(in(addr, 0xFF40, 0xFF7F)){
+           return ctrl[GPU].rb(addr);
+       }
+       else if(addr == 0xFFFF){
+           return interrupt_enable;
+       }
+       return 0;
     }
     
     public int rw(int addr){
@@ -152,66 +125,72 @@ public class MemoryMap implements IMemory{
     }
     
     public void wb(int addr, int value){
-        if(in(addr, 0, 0x00FF)){
-            //Restart and Interrupt Vectors
-            ROM_BANK_0.wb(addr, value);
-        }
-        else if(in(addr, 0x0100, 0x014F)){
-            //Cartridge Header
-            ROM_BANK_0.wb(addr, value);
-        }
-        else if(in(addr, 0x0150, 0x3FFF)){
-            //Cartridge ROM (fixed)
-            ROM_BANK_0.wb(addr, value);
-        }
-        else if(in(addr, 0x4000, 0x7FFF)){
-            //Cartridge ROM (switchable)
-            ROM_BANK_1.wb(addr, value);
-        }
-        else if(in(addr, 0x8000, 0x9FFF)){
-            //Video RAM
-            VRAM.wb(addr, value);
-        }
-        else if(in(addr, 0xA000, 0xBFFF)){
-            //External Cartridge RAM
-            EXTERNAL_RAM.wb(addr, value);
-        }
-        else if(in(addr, 0xC000, 0xCFFF)){
-            //Internal RAM (fixed)
-            INTERNAL_RAM.wb(addr, value);
-        }
-        else if(in(addr, 0xD000, 0xDFFF)){
-            //Internal RAM (switchable)
-            INTERNAL_RAM.wb(addr, value);
-        }
-        else if(in(addr, 0xE000, 0xFDFF)){
-            //Shadow Interal RAM
-            INTERNAL_RAM.wb(addr, value);
-        }
-        else if(in(addr, 0xFE00, 0xFE9F)){
-            //OAM (object attribute memory)
-            OAM.wb(addr, value);
-        }
-        else if(in(addr, 0xFEA0, 0xFEFF)){
-            //Unusable Memory
-        }
-        else if(in(addr, 0xFF00, 0xFF7F)){
-            //Hardware IO Registers
-            INPUT_OUTPUT.wb(addr, value);
-        }
-        else if(in(addr, 0xFF80, 0xFFFE)){
-            //Zero page
-            ZRAM.wb(addr, value);
-        }
-        else if(addr == 0xFFFF){
-            //Interrupt Enable Flag
-            INTERUPT_REGISTER.wb(addr, value);
-        }
+        if(in(addr, 0x0000, 0x3FFF)){
+           //Rom Bank 0
+           ctrl[ROM_BANK_0].wb(addr, value);
+       }
+       else if(in(addr, 0x4000, 0x7FFF)){
+           //Rom Bank 1
+           ctrl[ROM_BANK_1].wb(addr, value);
+       }
+       else if(in(addr, 0x8000, 0x9FFF)){
+           //Video Ram
+           ctrl[VRAM].wb(addr, value);
+       }
+       else if(in(addr, 0xA000, 0xBFFF)){
+           //Cartridge Ram
+           ctrl[EXTERNAL_RAM].wb(addr, value);
+       }
+       else if(in(addr, 0xC000, 0xFDFF)){
+           //Work Ram and Shadow
+           ctrl[INTERNAL_RAM].wb(addr, value);
+       }
+       else if(in(addr, 0xFE00, 0xFE9F)){
+           //Object Attribute Memory
+           ctrl[OAM].wb(addr, value);
+       }
+       else if(in(addr, 0xFF80, 0xFFFE)){
+           //Zero Page Ram
+           ctrl[ZRAM].wb(addr, value);
+       }
+       else if(addr == 0xFF00){
+           //Joystick input
+           ctrl[JOYSTICK].wb(addr, value);
+       }
+       else if(in(addr, 0xFF01, 0xFF03)){
+           //Serial IO Data, Control, UNKNOWN
+       }
+       else if(in(addr, 0xFF04, 0xFF0E)){
+           //Timer
+           ctrl[TIMER].wb(addr, value);
+       }
+       else if(addr == 0xFF0F){
+           //Interrupt Flags
+           interrupt_flags = value;
+       }
+       else if(in(addr, 0xFF10, 0xFF39)){
+           //Sound control, envelope ect
+       }
+       else if(in(addr, 0xFF40, 0xFF7F)){
+           ctrl[GPU].wb(addr, value);
+       }
+       else if(addr == 0xFFFF){
+           interrupt_enable = value;
+       }
     }
     
     public void ww(int addr, int value){
         wb(addr,value&255); 
         wb(addr+1,value>>8);
+    }
+    
+    public IMemory Get(int i){
+        return this.ctrl[i];
+    }
+    
+    public void Set(int i, IMemory map){
+        this.ctrl[i] = map;
+        map.SetMMU(this);
     }
     
 }

@@ -3,7 +3,14 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package gameboy;
+package gameboy.cpu;
+
+import gameboy.MemoryMap;
+import gameboy.Metrics;
+import gameboy.cpu.Op;
+import gameboy.cpu.Clock;
+import gameboy.cpu.Cpu;
+import java.util.ArrayList;
 
 /**
  *
@@ -27,26 +34,29 @@ public class Opcodes {
         this.clock = cpu.clock;
         this.mmu = cpu.GetMmu();
         
-        int count = 0; int ccount = 0;
+        ArrayList<Integer> count = new ArrayList<Integer>(); 
+        ArrayList<Integer> ccount = new ArrayList<Integer>(); 
         for(int i = 0 ; i < map.length; i++){
             if(map[i] == null){
-                count++;
-                Op XX = new Op(i, "XX"+i, null, () -> {
+                count.add(i);
+                Op XX = new Op(i, "XX", null, () -> {
                     System.out.println("Unimplemented opcode called at "+(reg.pc() - 1)+" with opcode "+mmu.rb((reg.pc() - 1)));
                 });
                 map[i] = XX;
             }
             if(cbmap[i] == null){
-                ccount++;
-                Op XX = new Op(i, "XX"+i, null, () -> {
+                ccount.add(i);
+                Op XX = new Op(i, "XX", null, () -> {
                     System.out.println("Unimplemented opcode called at "+(reg.pc() - 1)+" with opcode "+mmu.rb((reg.pc() - 1)));
                 });
                 cbmap[i] = XX;
             }
         }
         
-        System.out.println(count+" base opcodes undefined");
-        System.out.println(ccount+" CB opcodes undefined");
+        System.out.println(count.size()+" base opcodes undefined");
+        System.out.println(count.toString());
+        System.out.println(ccount.size()+" CB opcodes undefined");
+        System.out.println(ccount.toString());
         /*
         map = new Op[]{
             NOP, LDBCnn, LDBCmA, INCBC,
@@ -172,7 +182,6 @@ public class Opcodes {
             BIT7b, BIT7c, BIT7d, BIT7e,
             BIT7h, BIT7l, BIT7m, BIT7a,
         };*/
-        
     }
     
     public boolean isValidOpcode(int opcode){
@@ -196,7 +205,6 @@ public class Opcodes {
         Op op = this.map[opcode];
         return op; 
     }
-    
     
     //--------------------------------------------------------------------------
     // Helper functions
@@ -2849,14 +2857,16 @@ public class Opcodes {
     
     //Disables interrupts
     Op DI = new Op(0xF3, "DI", map, () -> {
-        //TODO
+        reg.ime(0);
+        
         clock.m(1);
         clock.t(4);
     });
     
     //Enabled interrupts
     Op EI = new Op(0xFB, "EI", map, () -> {
-        //TODO
+        reg.ime(1);
+        
         clock.m(1);
         clock.t(4);
     });
@@ -3027,6 +3037,8 @@ public class Opcodes {
         
         if(!reg.zero()){
             reg.pc(reg.pc() + i);
+            clock.m(1);
+            clock.t(4);
         }
         
         clock.m(2);
@@ -3042,6 +3054,8 @@ public class Opcodes {
         
         if(reg.zero()){
             reg.pc(reg.pc() + i);
+            clock.m(1);
+            clock.t(4);
         }
         
         clock.m(2);
@@ -3057,6 +3071,8 @@ public class Opcodes {
         
         if(!reg.carry()){
             reg.pc(reg.pc() + i);
+            clock.m(1);
+            clock.t(4);
         }
         
         clock.m(2);

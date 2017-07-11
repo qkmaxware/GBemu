@@ -3,8 +3,9 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package gameboy;
+package gameboy.game;
 
+import gameboy.game.Cartridge;
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;

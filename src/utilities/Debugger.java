@@ -5,11 +5,11 @@
  */
 package utilities;
 
-import gameboy.Cpu;
+import gameboy.cpu.Cpu;
 import gameboy.Gameboy;
 import gameboy.MemoryMap;
-import gameboy.Op;
-import gameboy.Registry;
+import gameboy.cpu.Op;
+import gameboy.cpu.Registry;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.GridLayout;
@@ -147,12 +147,12 @@ public class Debugger extends JFrame{
         
         ButtonGroup group = new ButtonGroup();
         JRadioButton decimal = new JRadioButton("decimal");
-        decimal.addActionListener((evt) -> {displayMode = 0;});
+        decimal.addActionListener((evt) -> {displayMode = 0; Refresh();});
         decimal.setSelected(true);
         JRadioButton hex = new JRadioButton("hex");
-        hex.addActionListener((evt) -> {displayMode = 1;});
+        hex.addActionListener((evt) -> {displayMode = 1; Refresh();});
         JRadioButton opc = new JRadioButton("opcode");
-        opc.addActionListener((evt) -> {displayMode = 2;});
+        opc.addActionListener((evt) -> {displayMode = 2; Refresh();});
         
         group.add(decimal);
         group.add(hex);
@@ -170,7 +170,7 @@ public class Debugger extends JFrame{
         
         JButton button2 = new JButton("Step");
         button2.addActionListener((evt) -> {
-            
+            Refresh();
         });
         
         JButton button3 = new JButton("Inject");
@@ -204,6 +204,8 @@ public class Debugger extends JFrame{
                    JOptionPane.showMessageDialog(null, "Failed to set value into desired address");
                }
             }
+            
+            Refresh();
         });
         
         JButton button4 = new JButton("Run Op");
@@ -215,6 +217,8 @@ public class Debugger extends JFrame{
             }catch(Exception e){
                 JOptionPane.showMessageDialog(null, "Failed to execute opcode");
             }
+            
+            Refresh();
         });
         
         
@@ -230,7 +234,7 @@ public class Debugger extends JFrame{
     }
     
     public void Refresh(){
-        for(int i = 0; i < mmu.MaxAddress(); i++){
+        for(int i = 0; i <= mmu.MaxAddress(); i++){
             ArrayList<String> row;
             if(i >= memoryTable.Rows()){
                 row = memoryTable.AddRow();

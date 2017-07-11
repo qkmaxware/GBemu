@@ -5,8 +5,8 @@
  */
 package main;
 
-import gameboy.Cartridge;
-import gameboy.CartridgeFactory;
+import gameboy.game.Cartridge;
+import gameboy.game.CartridgeFactory;
 import gameboy.Gameboy;
 import java.awt.Color;
 import java.awt.Dimension;
@@ -31,6 +31,7 @@ import javax.swing.JScrollPane;
 import javax.swing.ListSelectionModel;
 import javax.swing.SwingConstants;
 import utilities.Debugger;
+import utilities.SpriteViewer;
 
 /**
  *
@@ -51,14 +52,16 @@ public class SwingGB extends JFrame{
         }
     }
     
-    private Gameboy gb;
+    public final Gameboy gb;
     private Debugger debugger;
+    private SpriteViewer spriteViewer;
     
     public SwingGB(){
         //Assign code
         this.gb = new Gameboy();
         debugger = new Debugger(this.gb);
         debugger.setSize(640, 480);
+        spriteViewer = new SpriteViewer(this.gb);
         
         //Buid swing components
         this.setTitle("Gameboy Emulator");
@@ -92,6 +95,8 @@ public class SwingGB extends JFrame{
                 switch(evt.getClickCount()){
                     case 2:
                         gb.LoadCartridge(carts[list.locationToIndex(evt.getPoint())]);
+                        debugger.setVisible(true);
+                        spriteViewer.setVisible(true);
                         break;
                 }
             }
@@ -120,6 +125,10 @@ public class SwingGB extends JFrame{
     
     public Debugger getDebugger(){
         return debugger;
+    }
+    
+    public SpriteViewer getSpriteViewer(){
+        return spriteViewer;
     }
     
     public static Cartridge[] GetLocalCartridges(){

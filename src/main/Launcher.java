@@ -16,10 +16,9 @@ public class Launcher {
     public static void main(String[] args){
         
         SwingGB window = new SwingGB();
+        window.gb.Reset();
         window.setSize(new Dimension(300,360));
         window.setVisible(true);
-        
-        window.getDebugger().setVisible(true);
         
     }
     
