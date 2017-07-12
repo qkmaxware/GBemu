@@ -191,21 +191,19 @@ public class Debugger extends JFrame{
             if (result == JOptionPane.OK_OPTION) {
                try{
                     String t = loc.getText();
-                    int a;
-                    if(t.matches("-?[0-9a-fA-F]+")){
-                        a = Integer.parseInt(t, 16);
-                    }else{
-                        a= Integer.parseInt(t);
-                    }
+                    int a = Integer.parseInt(t, 16);
                     int b = Integer.parseInt(value.getText());
                     
+                    System.out.println("Trying to put "+b+" into "+a);
                     mmu.wb(a, b);
+                    int c = mmu.rb(a);
+                    if(c != b)
+                        System.out.println("Failed, unwritable");
+                    
                } catch(Exception e){
                    JOptionPane.showMessageDialog(null, "Failed to set value into desired address");
                }
             }
-            
-            Refresh();
         });
         
         JButton button4 = new JButton("Run Op");
@@ -217,8 +215,6 @@ public class Debugger extends JFrame{
             }catch(Exception e){
                 JOptionPane.showMessageDialog(null, "Failed to execute opcode");
             }
-            
-            Refresh();
         });
         
         

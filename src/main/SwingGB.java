@@ -8,30 +8,31 @@ package main;
 import gameboy.game.Cartridge;
 import gameboy.game.CartridgeFactory;
 import gameboy.Gameboy;
+import gameboy.gpu.Gpu;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
-import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.awt.event.MouseListener;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.FilenameFilter;
 import javax.swing.BoxLayout;
 import javax.swing.DefaultListCellRenderer;
-import javax.swing.JButton;
 import javax.swing.JFrame;
-import javax.swing.JLabel;
 import javax.swing.JList;
+import javax.swing.JMenu;
+import javax.swing.JMenuBar;
+import javax.swing.JMenuItem;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.ListSelectionModel;
 import javax.swing.SwingConstants;
 import utilities.Debugger;
 import utilities.SpriteViewer;
+import utilities.Tests;
 
 /**
  *
@@ -88,15 +89,49 @@ public class SwingGB extends JFrame{
         ((DefaultListCellRenderer)(body.getCellRenderer())).setHorizontalAlignment(SwingConstants.CENTER);
         ((DefaultListCellRenderer)(body.getCellRenderer())).setForeground(Color.WHITE);
         
+        //Renderer
+        JFrame renderer = new JFrame(){};
+        renderer.setSize(Gpu.LCD_WIDTH, Gpu.LCD_HEIGHT);
+        RenderPanel renderContainer = new RenderPanel();
+        renderContainer.buff = this.gb.gpu.canvas.GetImage();
+        renderer.add(renderContainer);
+        this.gb.OnBufferReady(() -> {
+            renderContainer.repaint();
+        });
+        JMenuBar menu = new JMenuBar();
+        renderer.setJMenuBar(menu);
+        
+        JMenu game = new JMenu("Game");
+        menu.add(game);
+        JMenuItem start = new JMenuItem("Play");
+        JMenuItem pause = new JMenuItem("Pause");
+        game.add(start);
+        game.add(pause);
+        
+        JMenu deb = new JMenu("Debugging");
+        menu.add(deb);
+        JMenuItem mem = new JMenuItem("Memory");
+        mem.addActionListener((evt) -> {
+            debugger.setVisible(true);
+        });
+        JMenuItem spr = new JMenuItem("Sprites");
+        spr.addActionListener((evt) -> {
+            spriteViewer.setVisible(true);
+        });
+        deb.add(mem);
+        deb.add(spr);
+        
+        
         body.addMouseListener(new MouseAdapter(){
             @Override
             public void mouseClicked(MouseEvent evt) {
                 JList list = (JList)evt.getSource();
                 switch(evt.getClickCount()){
                     case 2:
-                        gb.LoadCartridge(carts[list.locationToIndex(evt.getPoint())]);
-                        debugger.setVisible(true);
-                        spriteViewer.setVisible(true);
+                        Cartridge cart = carts[list.locationToIndex(evt.getPoint())];
+                        gb.LoadCartridge(cart);
+                        renderer.setTitle("Playing: "+cart.toString());
+                        renderer.setVisible(true);
                         break;
                 }
             }
@@ -113,14 +148,6 @@ public class SwingGB extends JFrame{
         contentPane.add(scroller);
         
         this.add(contentPane);
-        
-        //Renderer
-        JFrame renderer = new JFrame(){};
-        RenderPanel renderContainer = new RenderPanel();
-        renderer.add(renderContainer);
-        
-        
-        //renderContainer.buff = this.gb.gpu.canvas;
     }
     
     public Debugger getDebugger(){

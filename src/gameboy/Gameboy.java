@@ -9,6 +9,7 @@ import gameboy.disk.HDD;
 import gameboy.io.Input;
 import gameboy.game.Cartridge;
 import gameboy.cpu.Cpu;
+import gameboy.game.CartridgeAdapter;
 import gameboy.gpu.Gpu;
 import gameboy.io.Timer;
 
@@ -22,14 +23,18 @@ public class Gameboy {
     public final Gpu gpu;
     public final MemoryMap mmu;
     public final Input input;
+    public final Timer timer;
+    private final CartridgeAdapter adapter;
     
     public Gameboy(){
+        
         mmu = new MemoryMap();
 
         HDD onboard = new HDD();
         gpu = new Gpu();
         input = new Input();
-        Timer timer = new Timer();
+        timer = new Timer();
+        adapter = new CartridgeAdapter();
         
         mmu.Set(MemoryMap.INTERNAL_RAM, onboard);
         mmu.Set(MemoryMap.ZRAM, onboard);
@@ -41,6 +46,9 @@ public class Gameboy {
         mmu.Set(MemoryMap.VRAM, gpu);
         mmu.Set(MemoryMap.GPU, gpu);
         
+        mmu.Set(MemoryMap.ROM_BANK_0, adapter);
+        mmu.Set(MemoryMap.ROM_BANK_1, adapter);
+        mmu.Set(MemoryMap.EXTERNAL_RAM, adapter);
         
         cpu = new Cpu();
         cpu.SetMmu(mmu);
@@ -54,9 +62,11 @@ public class Gameboy {
     }
     
     public void LoadCartridge(Cartridge cart){
-        mmu.Set(MemoryMap.ROM_BANK_0, cart);
-        mmu.Set(MemoryMap.ROM_BANK_1, cart);
-        mmu.Set(MemoryMap.EXTERNAL_RAM, cart);
+        adapter.LoadCart(cart);
+    }
+    
+    public void OnBufferReady(Listener listener){
+        this.gpu.OnVBlank = listener;
     }
     
     private void Dispatch(){
@@ -65,5 +75,8 @@ public class Gameboy {
         
         //Step the gpu
         gpu.Step(deltaTime);
+        
+        //Step the timer
+        timer.Increment(deltaTime);
     }
 }

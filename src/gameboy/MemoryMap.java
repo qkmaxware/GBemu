@@ -44,8 +44,8 @@ public class MemoryMap{
     public static final int TIMER = 10;
     
     private IMemory[] ctrl = new IMemory[11];
-    private int interrupt_enable = 0;
-    private int interrupt_flags = 0;
+    public int i_enable = 0;
+    public int i_flags = 0;
     
     public void Reset(){
         for(IMemory mem : ctrl){
@@ -63,7 +63,7 @@ public class MemoryMap{
     }
     
     public int rb(int addr){
-       if(in(addr, 0x0000, 0x3FFFF)){
+       if(in(addr, 0x0000, 0x3FFF)){
            //Rom Bank 0
            return ctrl[ROM_BANK_0].rb(addr);
        }
@@ -105,7 +105,7 @@ public class MemoryMap{
        }
        else if(addr == 0xFF0F){
            //Interrupt Flags
-           return interrupt_flags;
+           return i_flags;
        }
        else if(in(addr, 0xFF10, 0xFF39)){
            //Sound control, envelope ect
@@ -115,7 +115,7 @@ public class MemoryMap{
            return ctrl[GPU].rb(addr);
        }
        else if(addr == 0xFFFF){
-           return interrupt_enable;
+           return i_enable;
        }
        return 0;
     }
@@ -126,12 +126,12 @@ public class MemoryMap{
     
     public void wb(int addr, int value){
         if(in(addr, 0x0000, 0x3FFF)){
-           //Rom Bank 0
-           ctrl[ROM_BANK_0].wb(addr, value);
+           //Rom Bank 0 -- Readonly
+           ctrl[ROM_BANK_0].wb(addr, value);    //Read Only Skip
        }
        else if(in(addr, 0x4000, 0x7FFF)){
-           //Rom Bank 1
-           ctrl[ROM_BANK_1].wb(addr, value);
+           //Rom Bank 1 -- Readonly
+           ctrl[ROM_BANK_1].wb(addr, value);    //Read Only Skip
        }
        else if(in(addr, 0x8000, 0x9FFF)){
            //Video Ram
@@ -139,7 +139,7 @@ public class MemoryMap{
        }
        else if(in(addr, 0xA000, 0xBFFF)){
            //Cartridge Ram
-           ctrl[EXTERNAL_RAM].wb(addr, value);
+           ctrl[EXTERNAL_RAM].wb(addr, value); //WORKING I WROTE TO THIS
        }
        else if(in(addr, 0xC000, 0xFDFF)){
            //Work Ram and Shadow
@@ -166,7 +166,7 @@ public class MemoryMap{
        }
        else if(addr == 0xFF0F){
            //Interrupt Flags
-           interrupt_flags = value;
+           i_flags = value;
        }
        else if(in(addr, 0xFF10, 0xFF39)){
            //Sound control, envelope ect
@@ -175,7 +175,7 @@ public class MemoryMap{
            ctrl[GPU].wb(addr, value);
        }
        else if(addr == 0xFFFF){
-           interrupt_enable = value;
+           i_enable = value;
        }
     }
     

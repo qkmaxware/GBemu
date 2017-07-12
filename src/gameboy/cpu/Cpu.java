@@ -38,10 +38,12 @@ public class Cpu {
         
         //Initial values expected by the bios
         reg.a(0x01);
-        reg.f(0xFFFE);
+        reg.f(0b11100000);
         reg.bc(0x0013);
         reg.de(0x00D8);
         reg.hl(0x014D);
+        reg.sp(0xFFFE);
+        reg.pc(0x0100);
         
         mmu.wb(0xFF05, 0x00);   //TIMA
         mmu.wb(0xFF06, 0x00);   //TMA

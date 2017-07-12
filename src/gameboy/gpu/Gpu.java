@@ -6,6 +6,7 @@
 package gameboy.gpu;
 
 import gameboy.IMemory;
+import gameboy.Listener;
 import gameboy.MemoryMap;
 import java.awt.Color;
 import java.util.Arrays;
@@ -27,6 +28,13 @@ public class Gpu implements IMemory{
     public static final int GPU_SCANLINEVRAM = 3;
     public static final int GPU_HBLANK = 0;
     public static final int GPU_VBLANK = 1;
+    
+    public static final int TIME_SCANLINEOAM = 80;
+    public static final int TIME_SCANLINEVRAM = 172;
+    public static final int TIME_HBLANK = 204;
+    public static final int TIME_FULLLINE = TIME_SCANLINEOAM + TIME_SCANLINEVRAM + TIME_HBLANK;
+    public static final int TIME_VBLANK = 4560;
+    public static final int TIME_FULLFRAME = TIME_FULLLINE*LCD_HEIGHT + TIME_VBLANK;
     
     //References
     private MemoryMap mmu;
@@ -55,10 +63,13 @@ public class Gpu implements IMemory{
     private final HashMap<Integer, Integer> reg = new HashMap<Integer, Integer>();
     private int yscroll = 0;
     private int xscroll = 0;
+    private int ywindow = 0;
+    private int xwindow = 0;
     private int curline = 0;
     private int gpumode = 2;
     private int clock = 0;
     
+    private int lcdstatus = 0;
     public boolean lcdon = true;
     public boolean largeobj = false;
     public boolean objon = true;
@@ -66,6 +77,8 @@ public class Gpu implements IMemory{
     
     public int bgtilebase = 0x0000;
     public int bgmapbase = 0x1800;
+    
+    public Listener OnVBlank;
     
     public Gpu(){ 
         //OAM data
@@ -79,21 +92,56 @@ public class Gpu implements IMemory{
     }
     
     public void Step(int step){
-        clock += step;
+        clock += step * 4;  //Step is in m time not in cycles (t)
+        
         switch(gpumode){
-            case 2: //Scanline OAM
-                
+            case GPU_SCANLINEOAM: //Scanline OAM
+                if(clock >= TIME_SCANLINEOAM){
+                    //Enter VRAM read mode
+                    gpumode = Gpu.GPU_SCANLINEVRAM;
+                    clock = 0;
+                }
                 break;
-            case 3: //Scanline VRAM
-                
+            case GPU_SCANLINEVRAM: //Scanline VRAM
+                if(clock >= TIME_SCANLINEVRAM){
+                    gpumode = Gpu.GPU_HBLANK;
+                    clock = 0;
+                    
+                    renderScanline();
+                }
                 break;
-            case 0: //Horizontal Blank
-
+            case GPU_HBLANK: //Horizontal Blank
+                if(clock >= TIME_HBLANK){
+                    clock = 0;
+                    curline++;
+                    
+                    //Check if we need to flush the buffer (ie screen drawing done)
+                    if(curline == 143){
+                        gpumode = Gpu.GPU_VBLANK;
+                        flushBuffer();
+                        mmu.i_flags |= 1; //Raise interupt
+                    }else{
+                        gpumode = Gpu.GPU_SCANLINEOAM;
+                    }
+                }
                 break;
-            case 1: //Vertical Blank
-
+            case GPU_VBLANK: //Vertical Blank
+                if(clock >= TIME_VBLANK){
+                    clock = 0;
+                    curline = 0;
+                    gpumode = Gpu.GPU_SCANLINEOAM;
+                }
                 break;
         }
+    }
+    
+    public void renderScanline(){
+        
+    }
+    
+    public void flushBuffer(){
+        if(this.OnVBlank != null)
+            this.OnVBlank.OnEvent();
     }
     
     @Override
@@ -129,7 +177,10 @@ public class Gpu implements IMemory{
         xscroll = 0;
         curline = 0;
         gpumode = 2;
+        ywindow = 0;
+        xwindow = 0;
         
+        lcdstatus = 0;
         lcdon = true;
         largeobj = false;
         objon = true;
@@ -203,17 +254,22 @@ public class Gpu implements IMemory{
 
     @Override
     public int rb(int addr) {
+        //VRAM
+        if(addr >= 0x8000 && addr <= 0x9FFF){
+            return vram[addr&0x1FFF];
+        }
+
         //OAM
         if(addr >= 0xFE00 && addr <= 0xFE9F){
             return oam[addr & 0xFF];
         }
         
-        //VRAM
+        //Registers
         switch(addr){
             case 0xFF40:    //LCD Control
                 return (lcdon ? 0x80 : 0) | (largeobj ? 0x04 : 0) | (objon ? 0x02 : 0) | (bgon ? 0x01 : 0) | ((bgtilebase == 0) ? 0x10 : 0) | ((bgmapbase == 0x1C00) ? 0x08 : 0);
             case 0xFF41:    //LCD Status
-                break;
+                return lcdstatus;
             case 0xFF42:    //Scroll Y         
                 return yscroll;
             case 0xFF43:    //Scroll X         
@@ -221,22 +277,32 @@ public class Gpu implements IMemory{
             case 0xFF44:    //Current scanline
                 return curline;
             case 0xFF45:    //Raster?
+                System.out.println("Something got me");
                 break;
             case 0xFF47:    //Background Pallet
             case 0xFF48:    //Object Pallet 0
             case 0xFF49:    //Object Pallet 1
-            case 0xFF4A:    //Window Y
-            case 0xFF4B:    //Window X
             default:
                 if(reg.containsKey(addr))
                     return reg.get(addr);
                 return 0;
+            case 0xFF4A:    //Window Y
+                return ywindow;
+            case 0xFF4B:    //Window X
+                return xwindow;
         }
         return 0;
     }
 
     @Override
     public void wb(int addr, int value) {
+        //VRAM
+        if(addr >= 0x8000 && addr <= 0x9FFF){
+            vram[addr&0x1FFF] = value;
+            updatetile(addr&0x1FFF, value);
+            return;
+        }
+        
         //OAM
         if(addr >= 0xFE00 && addr <= 0xFE9F){
             oam[addr & 0xFF] = value;
@@ -255,6 +321,7 @@ public class Gpu implements IMemory{
                 bgon = (value&0x01) != 0;
                 break;
             case 0xFF41:    //LCD Status
+                lcdstatus = value;
                 break;
             case 0xFF42:    //Scroll Y         
                 yscroll = value;
@@ -308,8 +375,10 @@ public class Gpu implements IMemory{
                 }
                 break;
             case 0xFF4A:    //Window Y
+                ywindow = value;
                 break;
             case 0xFF4B:    //Window X
+                xwindow = value;
                 break;
         }
     }
