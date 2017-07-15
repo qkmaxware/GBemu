@@ -26,7 +26,7 @@ import javax.swing.JTextField;
  *
  * @author Colin Halseth
  */
-public class SpriteViewer extends JFrame{
+public class TileViewer extends JFrame{
     
     public interface Action{
         public void Invoke(Graphics2D g2);
@@ -45,21 +45,15 @@ public class SpriteViewer extends JFrame{
     
     private JPanel drawPanel;
     
-    private JTextField spriteid;
-    private JTextField x = new JTextField();
-    private JTextField y = new JTextField();
-    private JTextField prior = new JTextField();
-    private JTextField xori = new JTextField();
-    private JTextField yori = new JTextField();
-    private JTextField pallet = new JTextField();
+    private JTextField tileid;
     
-    public SpriteViewer(Gameboy gb){
+    public TileViewer(Gameboy gb){
         super();
         
         this.gb = gb;
         this.gpu = gb.gpu;
         
-        this.setTitle("Sprites");
+        this.setTitle("Tiles");
         
         this.setLayout(new BorderLayout());
         
@@ -72,26 +66,26 @@ public class SpriteViewer extends JFrame{
         left.addActionListener((evt) -> {
             selected --;
             if(selected < 0)
-                selected = 39;
+                selected = gpu.tilemap.length - 1;
             
             Refresh();
         });
         
-        spriteid = new JTextField(String.valueOf(this.selected));
-        spriteid.setPreferredSize(new Dimension(100, 32));
-        spriteid.setEditable(false);
+        tileid = new JTextField(String.valueOf(this.selected));
+        tileid.setPreferredSize(new Dimension(100, 32));
+        tileid.setEditable(false);
         
         JButton right = new JButton(">");
         right.addActionListener((evt) -> {
             selected ++;
-            if(selected >= 40)
+            if(selected >= gpu.tilemap.length)
                 selected = 0;
             
             Refresh();
         });
         
         header.add(left);
-        header.add(spriteid);
+        header.add(tileid);
         header.add(right);
         
         DrawPanel center = new DrawPanel();
@@ -102,33 +96,6 @@ public class SpriteViewer extends JFrame{
             g2.drawImage(bmp.GetImage(), 0, 0, center.getWidth(), center.getHeight(), null);
         };
         
-        JPanel details = new JPanel();
-        details.setLayout(new GridLayout(-1, 1));
-        
-        details.setPreferredSize(new Dimension(120, 0));
-        
-        x = new JTextField(); x.setEditable(false);
-        y = new JTextField(); y.setEditable(false);
-        prior = new JTextField(); prior.setEditable(false);
-        xori = new JTextField(); xori.setEditable(false);
-        yori = new JTextField(); yori.setEditable(false);
-        pallet = new JTextField(); pallet.setEditable(false);
-        
-        details.add(new JLabel("X"));
-        details.add(x);
-        details.add(new JLabel("Y"));
-        details.add(y);
-        details.add(new JLabel("Priority"));
-        details.add(prior);
-        details.add(new JLabel("X Orientation"));
-        details.add(xori);
-        details.add(new JLabel("Y Orientation"));
-        details.add(yori);
-        details.add(new JLabel("Colour Pallet"));
-        details.add(pallet);
-        
-        this.add(details, BorderLayout.WEST);
-        
         JButton refresh = new JButton("Refresh");
         refresh.addActionListener((evt) -> {
             Refresh();
@@ -137,17 +104,9 @@ public class SpriteViewer extends JFrame{
     }
     
     public void Refresh(){
-        spriteid.setText(String.valueOf(this.selected));
+        tileid.setText(String.valueOf(this.selected));
         
-        Sprite spr = gpu.oam_data[this.selected];
-        x.setText(String.valueOf(spr.x));
-        y.setText(String.valueOf(spr.y));
-        prior.setText(String.valueOf(spr.priority));
-        xori.setText(String.valueOf(spr.xflip));
-        yori.setText(String.valueOf(spr.yflip));
-        pallet.setText(String.valueOf(spr.objPalette));
-        
-        int[][] tile = gpu.tilemap[spr.tile];
+        int[][] tile = gpu.tilemap[this.selected];
         
         for(int y = 0; y < 8; y++){
             for(int x = 0; x < 8; x++){

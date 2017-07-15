@@ -6,6 +6,7 @@
 package gameboy.cpu;
 
 import gameboy.MemoryMap;
+import java.util.concurrent.ConcurrentLinkedDeque;
 
 /**
  *
@@ -20,25 +21,27 @@ public class Cpu {
     
     public final Opcodes opcodes;
     
-    public Cpu(){
-        opcodes = new Opcodes(this);
-    }
+    public final ConcurrentLinkedDeque<String> recentOps = new ConcurrentLinkedDeque<String>();
     
-    public void SetMmu(MemoryMap map){
-        this.mmu = map;
+    public Cpu(MemoryMap mmu){
+        this.mmu = mmu;
+        opcodes = new Opcodes(this, mmu);
     }
-    
-    public MemoryMap GetMmu(){
-        return mmu;
+
+    private void LastOp(String value){
+        recentOps.addFirst(value);
+        while(recentOps.size() > 50)
+                recentOps.removeLast();
     }
     
     public void Reset(){
         reg.Reset();
         clock.Reset();
+        recentOps.clear();
         
         //Initial values expected by the bios
         reg.a(0x01);
-        reg.f(0b11100000);
+        reg.f(0xB0);
         reg.bc(0x0013);
         reg.de(0x00D8);
         reg.hl(0x014D);
@@ -82,11 +85,12 @@ public class Cpu {
         //Fetch intruction
         int opcode = mmu.rb(reg.pc());
         
-        //Increment PC
-        reg.pc(reg.pc() + 1);
-        
         //Decode instruction
         Op op = opcodes.Fetch(opcode);
+        LastOp(String.format("0x%04X", reg.pc()) + ": "+op.toString());
+        
+        //Increment PC
+        reg.pc(reg.pc() + 1);
         
         //Execute instruction
         op.Invoke(); 

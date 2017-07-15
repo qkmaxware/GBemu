@@ -13,11 +13,14 @@ import gameboy.cpu.Registry;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.GridLayout;
+import java.awt.Point;
+import java.awt.Rectangle;
 import java.util.ArrayList;
 import javax.swing.ButtonGroup;
 import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
+import javax.swing.JList;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JRadioButton;
@@ -25,6 +28,7 @@ import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
+import javax.swing.JViewport;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.table.TableModel;
 
@@ -67,6 +71,9 @@ public class Debugger extends JFrame{
     private TableModel memoryModel;
     private TableModel registryModel;
     private int displayMode = 0;
+    private JTextArea logger;
+    private JScrollPane logScroll;
+    private JTable table;
     
     public Debugger(Gameboy gb){
         this.setLayout(new BorderLayout());
@@ -100,7 +107,7 @@ public class Debugger extends JFrame{
             }
         };
         
-         String[] RegistryColumnNames = new String[]{"Register", "Value"};
+        String[] RegistryColumnNames = new String[]{"Register", "Value"};
         registryModel = new AbstractTableModel(){
             @Override
             public int getRowCount() {
@@ -126,13 +133,14 @@ public class Debugger extends JFrame{
             }
         };
         
-        JTable table = new JTable(memoryModel);
+        table = new JTable(memoryModel);
         this.add(new JScrollPane(table), BorderLayout.CENTER);
         
         JTable regTable = new JTable(registryModel);
         
-        JTextArea logger = new JTextArea();
-        JScrollPane logScroll = new JScrollPane(logger);
+        logger = new JTextArea();
+        logger.setEditable(false);
+        logScroll = new JScrollPane(logger);
         logScroll.setPreferredSize(new Dimension(300, 120));
         
         JPanel right = new JPanel();
@@ -143,6 +151,7 @@ public class Debugger extends JFrame{
         
         this.add(new JScrollPane(right), BorderLayout.EAST);
         
+        JPanel panelheader = new JPanel();
         JPanel footer = new JPanel();
         
         ButtonGroup group = new ButtonGroup();
@@ -170,7 +179,26 @@ public class Debugger extends JFrame{
         
         JButton button2 = new JButton("Step");
         button2.addActionListener((evt) -> {
+            gb.Dispatch();
             Refresh();
+            table.setRowSelectionInterval(reg.pc(), reg.pc());
+        });
+        
+        JButton button6 = new JButton("Breakpoint");
+        button6.addActionListener((evt) -> {
+            try{
+                String r = JOptionPane.showInputDialog(null, "Enter a break address");
+                int addr = Integer.parseInt(r,16);
+                while(true){
+                    gb.Dispatch();
+                    if(reg.pc() == addr)
+                        break;
+                }
+                Refresh();
+                table.setRowSelectionInterval(addr, addr);
+            }catch(Exception e){
+                JOptionPane.showMessageDialog(null, "Bad address format");
+            }
         });
         
         JButton button3 = new JButton("Inject");
@@ -180,11 +208,28 @@ public class Debugger extends JFrame{
             JTextField value = new JTextField();
             value.setPreferredSize(new Dimension(120, 32));
             
+            ButtonGroup mode = new ButtonGroup();
+            JRadioButton dmode = new JRadioButton("decimal");
+            dmode.setSelected(true);
+            JRadioButton hmode = new JRadioButton("hex");
+            JRadioButton bmode = new JRadioButton("binary");
+            mode.add(dmode);
+            mode.add(hmode);
+            mode.add(bmode);
+            
             JPanel panel = new JPanel();
-            panel.add(new JLabel("Addr:"));
-            panel.add(loc);
-            panel.add(new JLabel("V:"));
-            panel.add(value);
+            panel.setLayout(new BorderLayout());
+            JPanel inner = new JPanel();
+            inner.add(new JLabel("Addr:"));
+            inner.add(loc);
+            inner.add(new JLabel("V:"));
+            inner.add(value);
+            panel.add(inner, BorderLayout.CENTER);
+            JPanel header = new JPanel();
+            header.add(dmode);
+            header.add(hmode);
+            header.add(bmode);
+            panel.add(header, BorderLayout.NORTH);
             
             int result = JOptionPane.showConfirmDialog(null, panel, 
                "Value Injection Parameters", JOptionPane.OK_CANCEL_OPTION);
@@ -192,14 +237,21 @@ public class Debugger extends JFrame{
                try{
                     String t = loc.getText();
                     int a = Integer.parseInt(t, 16);
-                    int b = Integer.parseInt(value.getText());
-                    
+                    int b = 0;
+                    if(dmode.isSelected()){
+                        b = Integer.parseInt(value.getText());
+                    }else if(hmode.isSelected()){
+                        b = Integer.parseInt(value.getText(), 16);
+                    }else if(bmode.isSelected()){
+                        b = Integer.parseInt(value.getText(), 2);
+                    }
+                   
                     System.out.println("Trying to put "+b+" into "+a);
                     mmu.wb(a, b);
                     int c = mmu.rb(a);
                     if(c != b)
                         System.out.println("Failed, unwritable");
-                    
+                    Refresh();
                } catch(Exception e){
                    JOptionPane.showMessageDialog(null, "Failed to set value into desired address");
                }
@@ -212,24 +264,46 @@ public class Debugger extends JFrame{
             try{
                 int i = Integer.parseInt(r);
                 gb.cpu.opcodes.Fetch(i).Invoke();
+                Refresh();
             }catch(Exception e){
                 JOptionPane.showMessageDialog(null, "Failed to execute opcode");
             }
         });
         
-        
-        footer.add(displayMode);
+        JButton button5 = new JButton("Goto");
+        button5.addActionListener((evt) -> {
+            String r = JOptionPane.showInputDialog(null, "Select address to scroll to");
+            try{
+                int i = Integer.parseInt(r, 16);
+                System.out.println("jump to "+i);
+                Rectangle rect = table.getCellRect(i, 0, true);
+                Point pt = ((JViewport)table.getParent()).getViewPosition();
+                rect.setLocation(rect.x - pt.x, rect.y - pt.y);
+                table.scrollRectToVisible(rect);
+                table.setRowSelectionInterval(i, i);
+            }catch(Exception e){
+                JOptionPane.showMessageDialog(null, "Bad address format");
+            }
+        });
+         
+        panelheader.add(displayMode);
         footer.add(button);
+        footer.add(button5);
         footer.add(button2);
+        footer.add(button6);
         footer.add(button3);
         footer.add(button4);
         
         this.add(footer, BorderLayout.SOUTH);
+        this.add(panelheader, BorderLayout.NORTH);
         
         this.setTitle("Debugger");
     }
     
     public void Refresh(){
+        int startId = table.getSelectionModel().getMinSelectionIndex();
+        int endId = table.getSelectionModel().getMaxSelectionIndex();
+        
         for(int i = 0; i <= mmu.MaxAddress(); i++){
             ArrayList<String> row;
             if(i >= memoryTable.Rows()){
@@ -255,39 +329,52 @@ public class Debugger extends JFrame{
         while(registryTable.Rows() < 10){
             registryTable.AddRow();
         }
+        
+        String smallformat = (displayMode == 0 ? "%d" : "%02X");
+        String largeformat = (displayMode == 0 ? "%d" : "%04X");
+        
         registryTable.GetRow(0).set(0, "PC");
-        registryTable.GetRow(0).set(1, String.valueOf(reg.pc()));
+        registryTable.GetRow(0).set(1, String.format(largeformat, reg.pc()));
         
         registryTable.GetRow(1).set(0, "SP");
-        registryTable.GetRow(1).set(1, String.valueOf(reg.sp()));
+        registryTable.GetRow(1).set(1, String.format(largeformat, reg.sp()));
         
         registryTable.GetRow(2).set(0, "A");
-        registryTable.GetRow(2).set(1, String.valueOf(reg.a()));
+        registryTable.GetRow(2).set(1, String.format(smallformat,reg.a()));
         
         registryTable.GetRow(3).set(0, "B");
-        registryTable.GetRow(3).set(1, String.valueOf(reg.b()));
+        registryTable.GetRow(3).set(1, String.format(smallformat,reg.b()));
         
         registryTable.GetRow(4).set(0, "C");
-        registryTable.GetRow(4).set(1, String.valueOf(reg.a()));
+        registryTable.GetRow(4).set(1, String.format(smallformat,reg.c()));
         
         registryTable.GetRow(5).set(0, "D");
-        registryTable.GetRow(5).set(1, String.valueOf(reg.d()));
+        registryTable.GetRow(5).set(1, String.format(smallformat,reg.d()));
         
         registryTable.GetRow(6).set(0, "E");
-        registryTable.GetRow(6).set(1, String.valueOf(reg.e()));
+        registryTable.GetRow(6).set(1, String.format(smallformat,reg.e()));
         
         registryTable.GetRow(7).set(0, "H");
-        registryTable.GetRow(7).set(1, String.valueOf(reg.h()));
+        registryTable.GetRow(7).set(1, String.format(smallformat,reg.h()));
         
         registryTable.GetRow(8).set(0, "L");
-        registryTable.GetRow(8).set(1, String.valueOf(reg.a()));
+        registryTable.GetRow(8).set(1, String.format(smallformat, reg.l()));
         
         registryTable.GetRow(9).set(0, "Flags");
-        registryTable.GetRow(9).set(1, String.valueOf(reg.f()));
+        registryTable.GetRow(9).set(1, String.format(smallformat,reg.f()));
         
         ((AbstractTableModel)memoryModel).fireTableDataChanged();
         ((AbstractTableModel)registryModel).fireTableDataChanged();
+        
+        logger.setText(String.join("\n", cpu.recentOps));
+        this.logScroll.getVerticalScrollBar().setValue(0); //Stay at the top
+        
         this.repaint();
+        
+        //Preserve selection
+        if(startId != -1 && endId != -1){
+            table.setRowSelectionInterval(startId, endId);
+        }
     }
     
 }

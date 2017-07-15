@@ -26,6 +26,26 @@ public class Gameboy {
     public final Timer timer;
     private final CartridgeAdapter adapter;
     
+    private class GameThread extends Thread{
+        private final Gameboy gb;
+        public volatile boolean running = true;
+        public volatile boolean paused = false;
+        public GameThread(Gameboy owner){
+            this.gb = owner;
+        }
+        
+        public void run(){
+            while(running){
+                if(paused)
+                    continue;
+                
+                this.gb.Dispatch();
+            }
+        }
+    }
+    
+    private GameThread currentthread;
+    
     public Gameboy(){
         
         mmu = new MemoryMap();
@@ -50,15 +70,14 @@ public class Gameboy {
         mmu.Set(MemoryMap.ROM_BANK_1, adapter);
         mmu.Set(MemoryMap.EXTERNAL_RAM, adapter);
         
-        cpu = new Cpu();
-        cpu.SetMmu(mmu);
+        cpu = new Cpu(mmu);
         
     }
     
     public void Reset(){
         mmu.Reset();
-        cpu.Reset();
         gpu.Reset();
+        cpu.Reset();
     }
     
     public void LoadCartridge(Cartridge cart){
@@ -69,7 +88,25 @@ public class Gameboy {
         this.gpu.OnVBlank = listener;
     }
     
-    private void Dispatch(){
+    public void Play(){
+        Stop();
+    
+        this.Reset();
+        this.currentthread = new GameThread(this);
+        this.currentthread.start();
+    }
+    
+    public void Pause(){
+        if(this.currentthread != null)
+            this.currentthread.paused = true;
+    }
+    
+    public void Stop(){
+        if(this.currentthread != null)
+            this.currentthread.running = false;
+    }
+    
+    public void Dispatch(){
         //Step the cpu
         int deltaTime = cpu.Step();
         

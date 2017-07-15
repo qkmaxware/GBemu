@@ -14,6 +14,7 @@ import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
+import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
@@ -32,7 +33,9 @@ import javax.swing.ListSelectionModel;
 import javax.swing.SwingConstants;
 import utilities.Debugger;
 import utilities.SpriteViewer;
+import utilities.SpriteViewer.Action;
 import utilities.Tests;
+import utilities.TileViewer;
 
 /**
  *
@@ -63,6 +66,7 @@ public class SwingGB extends JFrame{
         debugger = new Debugger(this.gb);
         debugger.setSize(640, 480);
         spriteViewer = new SpriteViewer(this.gb);
+        TileViewer tileViewer = new TileViewer(this.gb);
         
         //Buid swing components
         this.setTitle("Gameboy Emulator");
@@ -104,6 +108,10 @@ public class SwingGB extends JFrame{
         JMenu game = new JMenu("Game");
         menu.add(game);
         JMenuItem start = new JMenuItem("Play");
+        start.addActionListener((evt) -> {
+            gb.Play();
+        });
+        
         JMenuItem pause = new JMenuItem("Pause");
         game.add(start);
         game.add(pause);
@@ -118,9 +126,13 @@ public class SwingGB extends JFrame{
         spr.addActionListener((evt) -> {
             spriteViewer.setVisible(true);
         });
+        JMenuItem tyl = new JMenuItem("Tiles");
+        tyl.addActionListener((evt) -> {
+            tileViewer.setVisible(true);
+        });
         deb.add(mem);
         deb.add(spr);
-        
+        deb.add(tyl);
         
         body.addMouseListener(new MouseAdapter(){
             @Override

@@ -66,17 +66,23 @@ public class Gpu implements IMemory{
     private int ywindow = 0;
     private int xwindow = 0;
     private int curline = 0;
+    private int curlineCheck = 0;
     private int gpumode = 2;
     private int clock = 0;
     
-    private int lcdstatus = 0;
+    public boolean windowon = true;
     public boolean lcdon = true;
     public boolean largeobj = false;
     public boolean objon = true;
     public boolean bgon = true;
+    public boolean coincidenceInterruptEnable = false;
+    public boolean oamInterruptEnable = false;
+    public boolean vblankInterruptEnable = false;
+    public boolean hblankInterruptEnable = false;
     
-    public int bgtilebase = 0x0000;
-    public int bgmapbase = 0x1800;
+    public boolean windowtile = false;
+    public boolean tiledatatable = false; //false = 0x0000;  true = 0x0800
+    public boolean tilemapdisplayselect = false;  //false = 0x1800;  true = 0x1C00
     
     public Listener OnVBlank;
     
@@ -90,8 +96,11 @@ public class Gpu implements IMemory{
         
         Reset();
     }
-    
+   
     public void Step(int step){
+        if(!lcdon)
+            return;
+        
         clock += step * 4;  //Step is in m time not in cycles (t)
         
         switch(gpumode){
@@ -136,7 +145,21 @@ public class Gpu implements IMemory{
     }
     
     public void renderScanline(){
+        if(bgon){
+            renderTiles();
+        }
         
+        if(objon){
+            renderSprites();
+        }
+    }
+    
+    public void renderTiles(){
+        
+    }
+    
+    public void renderSprites(){
+        //TODO
     }
     
     public void flushBuffer(){
@@ -176,18 +199,20 @@ public class Gpu implements IMemory{
         yscroll = 0;
         xscroll = 0;
         curline = 0;
+        curlineCheck = 0;
         gpumode = 2;
         ywindow = 0;
         xwindow = 0;
         
-        lcdstatus = 0;
+        windowon = true;
         lcdon = true;
         largeobj = false;
         objon = true;
         bgon = true;
     
-        bgtilebase = 0x0000;
-        bgmapbase = 0x1800;
+        windowtile = false;
+        tiledatatable = false;
+        tilemapdisplayselect = false;
         
         reg.clear();
     }
@@ -199,7 +224,7 @@ public class Gpu implements IMemory{
             addr --;
         }
         
-        int tile = (addr << 4) & 511;
+        int tile = (addr >> 4) & 511;
         int y = (addr >> 1) & 7;
         
         int sx;
@@ -267,9 +292,23 @@ public class Gpu implements IMemory{
         //Registers
         switch(addr){
             case 0xFF40:    //LCD Control
-                return (lcdon ? 0x80 : 0) | (largeobj ? 0x04 : 0) | (objon ? 0x02 : 0) | (bgon ? 0x01 : 0) | ((bgtilebase == 0) ? 0x10 : 0) | ((bgmapbase == 0x1C00) ? 0x08 : 0);
+                return (lcdon ? 0x80 : 0) | 
+                        (largeobj ? 0x04 : 0) | 
+                        (objon ? 0x02 : 0) | 
+                        (bgon ? 0x01 : 0) | 
+                        ((tiledatatable) ? 0x10 : 0) | 
+                        ((tilemapdisplayselect) ? 0x08 : 0) |
+                        (windowon ? 0x20 : 0) |
+                        (windowtile? (0x40) : 0);
             case 0xFF41:    //LCD Status
-                return lcdstatus;
+                    int v = 0;
+                    if(coincidenceInterruptEnable) v |= 0x40;
+                    if(oamInterruptEnable) v |= 0x20;
+                    if(vblankInterruptEnable) v |= 0x10;
+                    if(hblankInterruptEnable) v |= 0x08;
+                    if(curline == curlineCheck) v |= 0x04;
+                    v |= gpumode;
+                    return v;
             case 0xFF42:    //Scroll Y         
                 return yscroll;
             case 0xFF43:    //Scroll X         
@@ -277,8 +316,7 @@ public class Gpu implements IMemory{
             case 0xFF44:    //Current scanline
                 return curline;
             case 0xFF45:    //Raster?
-                System.out.println("Something got me");
-                break;
+                return curlineCheck;
             case 0xFF47:    //Background Pallet
             case 0xFF48:    //Object Pallet 0
             case 0xFF49:    //Object Pallet 1
@@ -291,20 +329,22 @@ public class Gpu implements IMemory{
             case 0xFF4B:    //Window X
                 return xwindow;
         }
-        return 0;
     }
 
     @Override
     public void wb(int addr, int value) {
         //VRAM
         if(addr >= 0x8000 && addr <= 0x9FFF){
+            System.out.println("Write to VRAM "+addr+" at index "+ (addr&0x1FFF)+" the value "+value);
             vram[addr&0x1FFF] = value;
             updatetile(addr&0x1FFF, value);
+            
             return;
         }
         
         //OAM
         if(addr >= 0xFE00 && addr <= 0xFE9F){
+            System.out.println("Write to OAM "+addr+" at index "+ (addr & 0xFF)+" the value "+value);
             oam[addr & 0xFF] = value;
             updateoam(addr, value);
             return;
@@ -313,15 +353,21 @@ public class Gpu implements IMemory{
         reg.put(addr, value);
         switch(addr){
             case 0xFF40:    //LCD Control
-                lcdon = (value & 0x80) != 0;
-                bgtilebase = ((value&0x10) != 0)?0x0000:0x0800;
-                bgmapbase = ((value&0x08) != 0)?0x1C00:0x1800;
-                largeobj = (value&0x04) != 0;
-                objon = (value&0x02) != 0;
-                bgon = (value&0x01) != 0;
+                lcdon = (value & 0x80) != 0;                    //BIT 7 - LCD Display (1=on, 0=off)
+                windowtile = (value & 0x40) != 0;               //BIT 6 - Window Tile Map Display (0=9800-9BFF, 1=9C00-9FFF)
+                windowon = (value & 0x20) != 0;                 //BIT 5 - Window Tile Display Enable (0=off, 1=on)
+                tiledatatable = ((value&0x10) != 0);            //BIT 4 - BG Tile Data Select (0=8800-97FF, 1=8000-8FFF)
+                tilemapdisplayselect = ((value&0x08) != 0);     //BIT 3 - BG Tile Map Select (0=9800-9BFF, 1=9C00-9FFF)
+                largeobj = (value&0x04) != 0;                   //BIT 2 - Sprite Size (0=8x8, 1=8x16)
+                objon = (value&0x02) != 0;                      //BIT 1 - Sprite Display (0=off, 1=on)
+                bgon = (value&0x01) != 0;                       //BIT 0 - BG Display (0=off, 1=on)
                 break;
             case 0xFF41:    //LCD Status
-                lcdstatus = value;
+                coincidenceInterruptEnable = (value & 0x40) == 0x40;
+                oamInterruptEnable = (value & 0x20) == 0x20;
+                vblankInterruptEnable = (value & 0x10) == 0x10;
+                hblankInterruptEnable = (value & 0x08) == 0x08;
+                gpumode = (value & 0x03);
                 break;
             case 0xFF42:    //Scroll Y         
                 yscroll = value;
@@ -333,8 +379,9 @@ public class Gpu implements IMemory{
                 curline = value;
                 break;
             case 0xFF45:    //Raster?
+                curlineCheck = value;
                 break;
-            case 0xFF46:    //Object Attribute Memory OAM
+            case 0xFF46:    //Object Attribute Memory OAM Direct Data Transfer
                 for(int i = 0; i < 160; i++){
                     int v = mmu.rb((value << 8) + i);
                     oam[i] = v;
