@@ -41,7 +41,7 @@ import utilities.TileViewer;
  *
  * @author Colin Halseth
  */
-public class SwingGB extends JFrame{
+public class DebugableSwingGB extends JFrame{
     
     private class RenderPanel extends JPanel{
         public BufferedImage buff;
@@ -60,7 +60,7 @@ public class SwingGB extends JFrame{
     private Debugger debugger;
     private SpriteViewer spriteViewer;
     
-    public SwingGB(){
+    public DebugableSwingGB(){
         //Assign code
         this.gb = new Gameboy();
         debugger = new Debugger(this.gb);
@@ -104,18 +104,7 @@ public class SwingGB extends JFrame{
         });
         JMenuBar menu = new JMenuBar();
         renderer.setJMenuBar(menu);
-        
-        JMenu game = new JMenu("Game");
-        menu.add(game);
-        JMenuItem start = new JMenuItem("Play");
-        start.addActionListener((evt) -> {
-            gb.Play();
-        });
-        
-        JMenuItem pause = new JMenuItem("Pause");
-        game.add(start);
-        game.add(pause);
-        
+
         JMenu deb = new JMenu("Debugging");
         menu.add(deb);
         JMenuItem mem = new JMenuItem("Memory");

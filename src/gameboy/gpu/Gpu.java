@@ -41,6 +41,7 @@ public class Gpu implements IMemory{
     
     //Drawing board
     public final Bitmap canvas = new Bitmap(LCD_WIDTH, LCD_HEIGHT);
+    private final Bitmap buffer = new Bitmap(LCD_WIDTH, LCD_HEIGHT);
     
     //VRAM
     private final int[] vram = new int[VRAM_SIZE];
@@ -65,6 +66,7 @@ public class Gpu implements IMemory{
     private int xscroll = 0;
     private int ywindow = 0;
     private int xwindow = 0;
+    private int curscan = 0;
     private int curline = 0;
     private int curlineCheck = 0;
     private int gpumode = 2;
@@ -98,71 +100,187 @@ public class Gpu implements IMemory{
     }
    
     public void Step(int step){
-        if(!lcdon)
-            return;
-        
-        clock += step * 4;  //Step is in m time not in cycles (t)
+        clock += step;  //Step is in m time not in cycles (t)
         
         switch(gpumode){
-            case GPU_SCANLINEOAM: //Scanline OAM
-                if(clock >= TIME_SCANLINEOAM){
-                    //Enter VRAM read mode
-                    gpumode = Gpu.GPU_SCANLINEVRAM;
-                    clock = 0;
-                }
-                break;
-            case GPU_SCANLINEVRAM: //Scanline VRAM
-                if(clock >= TIME_SCANLINEVRAM){
-                    gpumode = Gpu.GPU_HBLANK;
-                    clock = 0;
-                    
-                    renderScanline();
-                }
-                break;
-            case GPU_HBLANK: //Horizontal Blank
-                if(clock >= TIME_HBLANK){
-                    clock = 0;
-                    curline++;
-                    
-                    //Check if we need to flush the buffer (ie screen drawing done)
+            //In HBlank
+            case 0:
+                if(clock >= TIME_HBLANK / 4){
+                    //end of hblank, for last scanline render screen
                     if(curline == 143){
                         gpumode = Gpu.GPU_VBLANK;
+                        mmu.i_flags |= 1;
                         flushBuffer();
-                        mmu.i_flags |= 1; //Raise interupt
                     }else{
+                        gpumode = Gpu.GPU_SCANLINEOAM;
+                    }
+                    
+                    curline++;
+                    curscan += 640;
+                    clock = 0;
+                }
+                break;
+            //In VBlank
+            case 1:
+                if(clock >= 114){ //Worth 10 lines
+                    clock = 0;
+                    curline++;
+                    if(curline > 153){
+                        curline = 0;
+                        curscan = 0;
                         gpumode = Gpu.GPU_SCANLINEOAM;
                     }
                 }
                 break;
-            case GPU_VBLANK: //Vertical Blank
-                if(clock >= TIME_VBLANK){
+            //In OAM-read mode
+            case 2:
+                if(clock >= TIME_SCANLINEOAM / 4){
                     clock = 0;
-                    curline = 0;
-                    gpumode = Gpu.GPU_SCANLINEOAM;
+                    gpumode = Gpu.GPU_SCANLINEVRAM;
+                }
+                break;
+            //VRAM-read mode
+            case 3:
+                //Render scanline at end of allotted time
+                if(clock >= TIME_SCANLINEVRAM / 4){
+                    clock = 0;
+                    gpumode = Gpu.GPU_HBLANK;
+                    if(lcdon){
+                        renderScanline();
+                    }
                 }
                 break;
         }
     }
     
     public void renderScanline(){
+        int[] scanrow = new int[160];
         if(bgon){
-            renderTiles();
+            renderTiles(scanrow);
         }
         
         if(objon){
-            renderSprites();
+            renderSprites(scanrow);
         }
     }
     
-    public void renderTiles(){
+    public void renderTiles(int[] scanrow){
+        int pixelY = curline;
+        int bgmapbase = tilemapdisplayselect ? 0x1C00 : 0x1800;
+        int bgtilebase = tiledatatable ? 0x0800 : 0x0000;
+        int mapbase = (bgmapbase) + ((((curline + yscroll)&255)>>3)<<5);
         
+        int y = (curline + yscroll) & 7;
+        int x = xscroll & 7;
+        int t = (xscroll >> 3) & 31;
+        
+        if(bgtilebase != 0){
+            int tile = vram[mapbase + t];
+            if(tile < 128)
+                tile = 256 + tile;
+            int[] tilerow = tilemap[tile][y];
+            
+            for(int pixelX = 0; pixelX < 160; pixelX++){
+                //Set the pixel
+                int colorNum = tilerow[x];
+                Color c = this.bgpallet[colorNum];
+                buffer.SetColor(pixelX, pixelY, c);
+                x++;
+                
+                //Set the scanrow (for sprite collision checking)
+                scanrow[pixelX] = colorNum;
+                
+                //If done with this bg tile, move onto the next
+                if(x == 8){
+                    t = (t+1) & 31;
+                    x = 0;
+                    tile = vram[mapbase + t];
+                    if(tile < 128)
+                        tile = 256 + tile;
+                    tilerow = tilemap[tile][y];
+                }
+            }
+            
+        }else{
+            int tile = vram[mapbase + t];
+            int[] tilerow = tilemap[tile][y];
+            
+            for(int pixelX = 0; pixelX < 160; pixelX++){
+                //Set the pixel
+                int colorNum = tilerow[x];
+                Color c = this.bgpallet[colorNum];
+                buffer.SetColor(pixelX, pixelY, c);
+                x++;
+                
+                //Set the scanrow (for sprite collision checking)
+                scanrow[pixelX] = colorNum;
+                
+                //If done with this bg tile, move onto the next
+                if(x == 8){
+                    t = (t+1) & 31;
+                    x = 0;
+                    tile = vram[mapbase + t];
+                    tilerow = tilemap[tile][y];
+                }
+            }
+        }
     }
     
-    public void renderSprites(){
-        //TODO
+    public void renderSprites(int[] scanrow){
+        int pixelY = curline;
+        
+        if(largeobj){
+            //TODO
+        }else{
+           for(int i = 0; i < this.oam_data.length; i++){   //40 Sprites
+               Sprite spr = this.oam_data_sorted[i];
+               
+               //Does the sprite land on the scanline
+               if(spr.y <= curline && (spr.y + 8) > curline){
+                   int[] tilerow;
+                   
+                   //If y flipped, grab the opposite horizontal row
+                   if(spr.yflip == Sprite.YOrientation.Flipped){
+                       tilerow = tilemap[spr.tile][7-(curline - spr.y)];
+                   }else{
+                       tilerow = tilemap[spr.tile][curline - spr.y];
+                   }
+                   
+                   //Select the color pallet to use
+                   Color[] pallet;
+                   if(spr.objPalette == Sprite.Palette.Zero){
+                       pallet = this.obj0pallet;
+                   }else{
+                    pallet = this.obj1pallet;
+                   }
+                   
+                   //Draw sprite
+                   for(int x = 0; x < 8; x++){
+                       int pixelX = (spr.x + x) ; //This is wrong
+                       
+                       //Flip x coordinate if required
+                       int xpos = (spr.xflip == Sprite.XOrientation.Flipped) ? 7-x : x;
+                       int colorNum = tilerow[xpos];
+                       
+                       //Only if not WHITE (aka alpha) AND
+                       //Only if priority is above background or the background is white
+                       if(colorNum != 0 && (spr.priority == Sprite.Priority.AboveBackground || scanrow[pixelX] == 0)){
+                           Color c = pallet[colorNum];
+                           buffer.SetColor(pixelX, pixelY, c);
+                       }
+                   }
+                   
+               }
+           } 
+        }
     }
     
     public void flushBuffer(){
+        for(int x = 0; x < canvas.width; x++){
+            for(int y = 0; y < canvas.height; y++){
+                canvas.SetColor(x, y, buffer.GetColor(x, y));
+            }
+        }
         if(this.OnVBlank != null)
             this.OnVBlank.OnEvent();
     }
@@ -198,6 +316,7 @@ public class Gpu implements IMemory{
         //Inernal values
         yscroll = 0;
         xscroll = 0;
+        curscan = 0;
         curline = 0;
         curlineCheck = 0;
         gpumode = 2;

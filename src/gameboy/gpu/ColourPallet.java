@@ -16,12 +16,22 @@ public class ColourPallet {
         public Color DARK = Color.BLACK;
         public Color MEDIUM = Color.DARK_GRAY;
         public Color LIGHT = Color.GRAY;
-        public Color WHITE = Color.WHITE;
+        public Color WHITE = Color.WHITE; //White is alpha for sprites
     }
     
-   
-    public ColourMap bg = new ColourMap();
-    public ColourMap obj0 = new ColourMap();
-    public ColourMap obj1 = new ColourMap();
+    public ColourMap bg;
+    public ColourMap obj0;
+    public ColourMap obj1;
+    
+    public ColourPallet(){
+        bg = new ColourMap();
+        obj0 = new ColourMap();
+        obj1 = new ColourMap();
+        
+        obj0.WHITE = new Color(255,255,255,0);
+        obj1.WHITE = new Color(255,255,255,0);
+    }
+    
+    
     
 }

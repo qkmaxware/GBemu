@@ -25,27 +25,7 @@ public class Gameboy {
     public final Input input;
     public final Timer timer;
     private final CartridgeAdapter adapter;
-    
-    private class GameThread extends Thread{
-        private final Gameboy gb;
-        public volatile boolean running = true;
-        public volatile boolean paused = false;
-        public GameThread(Gameboy owner){
-            this.gb = owner;
-        }
-        
-        public void run(){
-            while(running){
-                if(paused)
-                    continue;
-                
-                this.gb.Dispatch();
-            }
-        }
-    }
-    
-    private GameThread currentthread;
-    
+
     public Gameboy(){
         
         mmu = new MemoryMap();
@@ -89,21 +69,13 @@ public class Gameboy {
     }
     
     public void Play(){
-        Stop();
-    
-        this.Reset();
-        this.currentthread = new GameThread(this);
-        this.currentthread.start();
-    }
-    
-    public void Pause(){
-        if(this.currentthread != null)
-            this.currentthread.paused = true;
-    }
-    
-    public void Stop(){
-        if(this.currentthread != null)
-            this.currentthread.running = false;
+        while(true){
+            try{
+                Dispatch();
+            }catch(Exception e){
+                break;
+            }
+        }
     }
     
     public void Dispatch(){

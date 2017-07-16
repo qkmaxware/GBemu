@@ -29,9 +29,9 @@ public class Cpu {
     }
 
     private void LastOp(String value){
-        recentOps.addFirst(value);
+        recentOps.addLast(value);
         while(recentOps.size() > 50)
-                recentOps.removeLast();
+                recentOps.removeFirst();
     }
     
     public void Reset(){

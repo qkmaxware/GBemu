@@ -20,7 +20,6 @@ import javax.swing.ButtonGroup;
 import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
-import javax.swing.JList;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JRadioButton;
@@ -137,6 +136,8 @@ public class Debugger extends JFrame{
         this.add(new JScrollPane(table), BorderLayout.CENTER);
         
         JTable regTable = new JTable(registryModel);
+        JScrollPane regScroll = new JScrollPane(regTable);
+        regScroll.setPreferredSize(new Dimension(300, 120));
         
         logger = new JTextArea();
         logger.setEditable(false);
@@ -146,7 +147,7 @@ public class Debugger extends JFrame{
         JPanel right = new JPanel();
         right.setLayout(new GridLayout(0,1));
         right.setPreferredSize(new Dimension(300, 120));
-        right.add(regTable);
+        right.add(regScroll);
         right.add(logScroll);
         
         this.add(new JScrollPane(right), BorderLayout.EAST);
@@ -186,19 +187,42 @@ public class Debugger extends JFrame{
         
         JButton button6 = new JButton("Breakpoint");
         button6.addActionListener((evt) -> {
-            try{
-                String r = JOptionPane.showInputDialog(null, "Enter a break address");
-                int addr = Integer.parseInt(r,16);
-                while(true){
-                    gb.Dispatch();
-                    if(reg.pc() == addr)
-                        break;
-                }
-                Refresh();
-                table.setRowSelectionInterval(addr, addr);
-            }catch(Exception e){
-                JOptionPane.showMessageDialog(null, "Bad address format");
-            }
+            JFrame breakpointframe = new JFrame();
+            JPanel brealpointpanel = new JPanel();
+            JTextField breakpointfield = new JTextField();
+            brealpointpanel.setLayout(new BorderLayout());
+            brealpointpanel.add(new JLabel("Address"), BorderLayout.NORTH);
+            brealpointpanel.add(breakpointfield, BorderLayout.CENTER);
+            JButton breakpointnext = new JButton("Next");
+            breakpointnext.addActionListener((evt2) -> {
+                //Run action in a whole new thread
+                Thread t = new Thread(){
+                    @Override
+                    public void run(){
+                        try{
+                            String r = breakpointfield.getText();
+                            int addr = Integer.parseInt(r,16);
+                            while(true){
+                                gb.Dispatch();
+                                if(reg.pc() == addr)
+                                    break;
+                            }
+                            Refresh();
+                            table.setRowSelectionInterval(addr, addr);
+                        }catch(Exception e){
+                            JOptionPane.showMessageDialog(null, "Bad address format");
+                        }
+                    }
+                };
+                t.start();
+            });
+            brealpointpanel.add(breakpointnext, BorderLayout.SOUTH);
+            
+            breakpointframe.add(brealpointpanel);
+            breakpointframe.setSize(320, 120);
+            breakpointframe.setTitle("Breakpoint Browser");
+            breakpointframe.setVisible(true);
+            
         });
         
         JButton button3 = new JButton("Inject");
@@ -326,7 +350,7 @@ public class Debugger extends JFrame{
             }            
         }
         
-        while(registryTable.Rows() < 10){
+        while(registryTable.Rows() < 14){
             registryTable.AddRow();
         }
         
@@ -342,32 +366,46 @@ public class Debugger extends JFrame{
         registryTable.GetRow(2).set(0, "A");
         registryTable.GetRow(2).set(1, String.format(smallformat,reg.a()));
         
-        registryTable.GetRow(3).set(0, "B");
-        registryTable.GetRow(3).set(1, String.format(smallformat,reg.b()));
+        registryTable.GetRow(3).set(0, "F (flags)");
+        registryTable.GetRow(2).set(1, String.format(smallformat,reg.f()));
         
-        registryTable.GetRow(4).set(0, "C");
-        registryTable.GetRow(4).set(1, String.format(smallformat,reg.c()));
+        registryTable.GetRow(4).set(0, "B");
+        registryTable.GetRow(4).set(1, String.format(smallformat,reg.b()));
         
-        registryTable.GetRow(5).set(0, "D");
-        registryTable.GetRow(5).set(1, String.format(smallformat,reg.d()));
+        registryTable.GetRow(5).set(0, "C");
+        registryTable.GetRow(5).set(1, String.format(smallformat,reg.c()));
         
-        registryTable.GetRow(6).set(0, "E");
-        registryTable.GetRow(6).set(1, String.format(smallformat,reg.e()));
+        registryTable.GetRow(6).set(0, "D");
+        registryTable.GetRow(6).set(1, String.format(smallformat,reg.d()));
         
-        registryTable.GetRow(7).set(0, "H");
-        registryTable.GetRow(7).set(1, String.format(smallformat,reg.h()));
+        registryTable.GetRow(7).set(0, "E");
+        registryTable.GetRow(7).set(1, String.format(smallformat,reg.e()));
         
-        registryTable.GetRow(8).set(0, "L");
-        registryTable.GetRow(8).set(1, String.format(smallformat, reg.l()));
+        registryTable.GetRow(8).set(0, "H");
+        registryTable.GetRow(8).set(1, String.format(smallformat,reg.h()));
         
-        registryTable.GetRow(9).set(0, "Flags");
-        registryTable.GetRow(9).set(1, String.format(smallformat,reg.f()));
+        registryTable.GetRow(9).set(0, "L");
+        registryTable.GetRow(9).set(1, String.format(smallformat, reg.l()));
+        
+        //Spacer
+        registryTable.GetRow(10).set(0, "");
+        registryTable.GetRow(10).set(1, "");
+        
+        registryTable.GetRow(11).set(0, "IME");
+        registryTable.GetRow(11).set(1, String.format(smallformat, reg.ime()));
+        
+        registryTable.GetRow(12).set(0, "IE");
+        registryTable.GetRow(12).set(1, String.format(smallformat, mmu.rb(0xFFFF)));
+        
+        registryTable.GetRow(13).set(0, "IF");
+        registryTable.GetRow(13).set(1, String.format(smallformat, mmu.rb(0xFF0F)));
+        
         
         ((AbstractTableModel)memoryModel).fireTableDataChanged();
         ((AbstractTableModel)registryModel).fireTableDataChanged();
         
         logger.setText(String.join("\n", cpu.recentOps));
-        this.logScroll.getVerticalScrollBar().setValue(0); //Stay at the top
+        this.logScroll.getVerticalScrollBar().setValue(1); //Stay at the top
         
         this.repaint();
         
