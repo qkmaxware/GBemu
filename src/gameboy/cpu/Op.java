@@ -31,7 +31,7 @@ public class Op {
    }
 
    public String toString(){
-       return name + " - " +String.format("0x%04X", hex);
+       return name;
    }
    
    public int hashCode(){

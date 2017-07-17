@@ -24,10 +24,10 @@ public class Gpu implements IMemory{
     public static final int LCD_HEIGHT = 144;
     public static final int LCD_WIDTH = 160;
     
-    public static final int GPU_SCANLINEOAM = 2;
-    public static final int GPU_SCANLINEVRAM = 3;
-    public static final int GPU_HBLANK = 0;
-    public static final int GPU_VBLANK = 1;
+    public static final int GPU_SCANLINEOAM = 2;    //10
+    public static final int GPU_SCANLINEVRAM = 3;   //11
+    public static final int GPU_HBLANK = 0;         //00
+    public static final int GPU_VBLANK = 1;         //01
     
     public static final int TIME_SCANLINEOAM = 80;
     public static final int TIME_SCANLINEVRAM = 172;
@@ -68,7 +68,7 @@ public class Gpu implements IMemory{
     private int xwindow = 0;
     private int curscan = 0;
     private int curline = 0;
-    private int curlineCheck = 0;
+    private int lyc = 0;
     private int gpumode = 2;
     private int clock = 0;
     
@@ -82,7 +82,7 @@ public class Gpu implements IMemory{
     public boolean vblankInterruptEnable = false;
     public boolean hblankInterruptEnable = false;
     
-    public boolean windowtile = false;
+    public boolean windowtile = false;    //False = 0x1800, true = unknown
     public boolean tiledatatable = false; //false = 0x0000;  true = 0x0800
     public boolean tilemapdisplayselect = false;  //false = 0x1800;  true = 0x1C00
     
@@ -145,7 +145,7 @@ public class Gpu implements IMemory{
                 if(clock >= TIME_SCANLINEVRAM / 4){
                     clock = 0;
                     gpumode = Gpu.GPU_HBLANK;
-                    if(lcdon){
+                    if(lcdon){ 
                         renderScanline();
                     }
                 }
@@ -155,6 +155,7 @@ public class Gpu implements IMemory{
     
     public void renderScanline(){
         int[] scanrow = new int[160];
+        
         if(bgon){
             renderTiles(scanrow);
         }
@@ -201,7 +202,7 @@ public class Gpu implements IMemory{
                 }
             }
             
-        }else{
+        }else{ 
             int tile = vram[mapbase + t];
             int[] tilerow = tilemap[tile][y];
             
@@ -229,34 +230,37 @@ public class Gpu implements IMemory{
     public void renderSprites(int[] scanrow){
         int pixelY = curline;
         
+        int count = 0; //TODO max draw 10 sprites per line
+        
         if(largeobj){
-            //TODO
+            //TODO deal with double 8x16 sized sprites
+            
         }else{
            for(int i = 0; i < this.oam_data.length; i++){   //40 Sprites
                Sprite spr = this.oam_data_sorted[i];
                
                //Does the sprite land on the scanline
                if(spr.y <= curline && (spr.y + 8) > curline){
-                   int[] tilerow;
+                    int[] tilerow;
                    
-                   //If y flipped, grab the opposite horizontal row
-                   if(spr.yflip == Sprite.YOrientation.Flipped){
+                    //If y flipped, grab the opposite horizontal row
+                    if(spr.yflip == Sprite.YOrientation.Flipped){
                        tilerow = tilemap[spr.tile][7-(curline - spr.y)];
-                   }else{
+                    }else{
                        tilerow = tilemap[spr.tile][curline - spr.y];
-                   }
+                    }
                    
-                   //Select the color pallet to use
-                   Color[] pallet;
-                   if(spr.objPalette == Sprite.Palette.Zero){
+                    //Select the color pallet to use
+                    Color[] pallet;
+                    if(spr.objPalette == Sprite.Palette.Zero){
                        pallet = this.obj0pallet;
-                   }else{
-                    pallet = this.obj1pallet;
-                   }
+                    }else{
+                        pallet = this.obj1pallet;
+                    }
                    
                    //Draw sprite
                    for(int x = 0; x < 8; x++){
-                       int pixelX = (spr.x + x) ; //This is wrong
+                       int pixelX = (spr.x + x); //This is wrong - xscroll
                        
                        //Flip x coordinate if required
                        int xpos = (spr.xflip == Sprite.XOrientation.Flipped) ? 7-x : x;
@@ -278,11 +282,15 @@ public class Gpu implements IMemory{
     public void flushBuffer(){
         for(int x = 0; x < canvas.width; x++){
             for(int y = 0; y < canvas.height; y++){
-                canvas.SetColor(x, y, buffer.GetColor(x, y));
+                Color c = buffer.GetColor(x, y);
+                canvas.SetColor(x, y, c);
             }
         }
-        if(this.OnVBlank != null)
+        System.out.println("Vblank");
+        
+        if(this.OnVBlank != null){
             this.OnVBlank.OnEvent();
+        }
     }
     
     @Override
@@ -313,12 +321,12 @@ public class Gpu implements IMemory{
         Arrays.fill(obj0pallet, colours.obj0.WHITE);
         Arrays.fill(obj1pallet, colours.obj1.WHITE);
         
-        //Inernal values
+        //Internal values
         yscroll = 0;
         xscroll = 0;
         curscan = 0;
         curline = 0;
-        curlineCheck = 0;
+        lyc = 0;
         gpumode = 2;
         ywindow = 0;
         xwindow = 0;
@@ -334,6 +342,17 @@ public class Gpu implements IMemory{
         tilemapdisplayselect = false;
         
         reg.clear();
+        
+        //LCD status setup
+        gpumode = GPU_VBLANK;
+        clock = 0;
+        
+        coincidenceInterruptEnable = false;
+        oamInterruptEnable = false;
+        vblankInterruptEnable = false;
+        hblankInterruptEnable = false;
+
+        reg.put(0xFF41, 0b10000000);
     }
     
     protected void updatetile(int addr, int value){
@@ -345,6 +364,8 @@ public class Gpu implements IMemory{
         
         int tile = (addr >> 4) & 511;
         int y = (addr >> 1) & 7;
+        
+        //System.out.println("Update tile "+tile);
         
         int sx;
         for(int x = 0; x < 8; x++){
@@ -360,7 +381,9 @@ public class Gpu implements IMemory{
         if (obj > 40 || obj < 0) {
             return;
         }
-
+        
+        //System.out.println("Update sprite "+obj);
+        
         switch (addr & 3) {
             case 0:
                 oam_data[obj].y = value - 16;
@@ -395,7 +418,74 @@ public class Gpu implements IMemory{
             }
         });
     }
-
+    
+    private int getLcdStatus(){
+        int result = gpumode;           //Mode flag
+        if(curline == lyc){             //LYC=LY flag
+            result |= 0b100;
+        }
+        if(hblankInterruptEnable){      //Mode 0 interrupt enabled
+            result |= 0b1000;
+        }
+        if(vblankInterruptEnable){      //Mode 1 interrupt enabled
+            result |=  0b10000;
+        }
+        if(oamInterruptEnable){         //Mode 2 interrupt enabled
+            result |= 0b100000;
+        }
+        if(coincidenceInterruptEnable){ //LYC = LY interrupt enabled
+            result |= 0b1000000;
+        }
+        //What about bit 7?
+        if(reg.containsKey(0xFF41)){    //Preserve saved bit 7
+            result |= 0b10000000;
+        }
+        
+        return result;
+    }
+    
+    private void setLcdStatus(int value){
+        //Extract out bit-pattern
+        coincidenceInterruptEnable = (value & 0x40) == 0x40;
+        oamInterruptEnable = (value & 0x20) == 0x20;
+        vblankInterruptEnable = (value & 0x10) == 0x10;
+        hblankInterruptEnable = (value & 0x08) == 0x08;
+        
+        //If lcd is not on, set the mode to 1 and reset the scanline
+        if(!lcdon){
+            curline = 0;
+            gpumode = Gpu.GPU_VBLANK;
+            return;
+        }
+        
+        int currentMode = gpumode;
+        int desiredMode = (value & 0x03);
+        
+        boolean requireInterrupt = false;
+        if(currentMode == Gpu.GPU_VBLANK){
+            requireInterrupt = vblankInterruptEnable;
+        } else if(currentMode == Gpu.GPU_HBLANK){
+            requireInterrupt = hblankInterruptEnable;
+        } else if(currentMode == Gpu.GPU_SCANLINEOAM){
+            requireInterrupt = oamInterruptEnable;
+        }
+        
+        //Just entered a new mode, request interrupt
+        if(requireInterrupt && (currentMode != desiredMode)){
+            mmu.i_flags |= 2;   //Bit 2, LCDC interrupt
+        }
+        
+        //Check the coincidence flag
+        if(curline == lyc){
+            if(coincidenceInterruptEnable)
+                mmu.i_flags |= 2;
+        }
+        
+        //Finally, set the gpu mode
+        gpumode = desiredMode;
+    }
+    
+    
     @Override
     public int rb(int addr) {
         //VRAM
@@ -420,14 +510,7 @@ public class Gpu implements IMemory{
                         (windowon ? 0x20 : 0) |
                         (windowtile? (0x40) : 0);
             case 0xFF41:    //LCD Status
-                    int v = 0;
-                    if(coincidenceInterruptEnable) v |= 0x40;
-                    if(oamInterruptEnable) v |= 0x20;
-                    if(vblankInterruptEnable) v |= 0x10;
-                    if(hblankInterruptEnable) v |= 0x08;
-                    if(curline == curlineCheck) v |= 0x04;
-                    v |= gpumode;
-                    return v;
+                    return getLcdStatus();
             case 0xFF42:    //Scroll Y         
                 return yscroll;
             case 0xFF43:    //Scroll X         
@@ -435,7 +518,7 @@ public class Gpu implements IMemory{
             case 0xFF44:    //Current scanline
                 return curline;
             case 0xFF45:    //Raster?
-                return curlineCheck;
+                return lyc;
             case 0xFF47:    //Background Pallet
             case 0xFF48:    //Object Pallet 0
             case 0xFF49:    //Object Pallet 1
@@ -454,16 +537,13 @@ public class Gpu implements IMemory{
     public void wb(int addr, int value) {
         //VRAM
         if(addr >= 0x8000 && addr <= 0x9FFF){
-            System.out.println("Write to VRAM "+addr+" at index "+ (addr&0x1FFF)+" the value "+value);
             vram[addr&0x1FFF] = value;
             updatetile(addr&0x1FFF, value);
-            
             return;
         }
         
         //OAM
         if(addr >= 0xFE00 && addr <= 0xFE9F){
-            System.out.println("Write to OAM "+addr+" at index "+ (addr & 0xFF)+" the value "+value);
             oam[addr & 0xFF] = value;
             updateoam(addr, value);
             return;
@@ -482,11 +562,8 @@ public class Gpu implements IMemory{
                 bgon = (value&0x01) != 0;                       //BIT 0 - BG Display (0=off, 1=on)
                 break;
             case 0xFF41:    //LCD Status
-                coincidenceInterruptEnable = (value & 0x40) == 0x40;
-                oamInterruptEnable = (value & 0x20) == 0x20;
-                vblankInterruptEnable = (value & 0x10) == 0x10;
-                hblankInterruptEnable = (value & 0x08) == 0x08;
-                gpumode = (value & 0x03);
+                System.out.println("LCD set to "+value);
+                setLcdStatus(value);
                 break;
             case 0xFF42:    //Scroll Y         
                 yscroll = value;
@@ -498,7 +575,7 @@ public class Gpu implements IMemory{
                 curline = value;
                 break;
             case 0xFF45:    //Raster?
-                curlineCheck = value;
+                lyc = value;
                 break;
             case 0xFF46:    //Object Attribute Memory OAM Direct Data Transfer
                 for(int i = 0; i < 160; i++){

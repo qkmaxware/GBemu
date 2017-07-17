@@ -18,7 +18,7 @@ public class Registry {
     private int flags;
     private int high, low;
     private int sp, pc;
-    private int ime;
+    private int ime = 1;
     
     //Manipulators --------------------------------------------------------
     public void Reset(){
@@ -26,7 +26,7 @@ public class Registry {
         flags = 0;
         high = 0; low = 0;
         sp = 0; pc = 0;
-        ime = 0;
+        ime = 1;
     }
     
     //Accessors -----------------------------------------------------------

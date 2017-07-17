@@ -38,7 +38,6 @@ public class SpriteViewer extends JFrame{
         public void paintComponent(Graphics g){ if(draw != null) draw.Invoke((Graphics2D)g); }
     }
     
-    private Gameboy gb;
     private Gpu gpu;
     private int selected =0;
     private Bitmap bmp = new Bitmap(8,8);
@@ -56,7 +55,6 @@ public class SpriteViewer extends JFrame{
     public SpriteViewer(Gameboy gb){
         super();
         
-        this.gb = gb;
         this.gpu = gb.gpu;
         
         this.setTitle("Sprites");

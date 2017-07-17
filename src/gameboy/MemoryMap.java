@@ -44,8 +44,8 @@ public class MemoryMap{
     public static final int TIMER = 10;
     
     private IMemory[] ctrl = new IMemory[11];
-    public int i_enable = 0;
-    public int i_flags = 0;
+    public int i_enable = 0;    //Which interupts are enabled
+    public int i_flags = 0;     //Which interrupts need to be fired
     
     public void Reset(){
         for(IMemory mem : ctrl){

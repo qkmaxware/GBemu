@@ -27,9 +27,6 @@ public class ColourPallet {
         bg = new ColourMap();
         obj0 = new ColourMap();
         obj1 = new ColourMap();
-        
-        obj0.WHITE = new Color(255,255,255,0);
-        obj1.WHITE = new Color(255,255,255,0);
     }
     
     

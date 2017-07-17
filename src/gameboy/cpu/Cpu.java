@@ -16,12 +16,14 @@ public class Cpu {
     
     public final Registry reg = new Registry();
     public final Clock clock = new Clock();
+    public final Registry cpp = new Registry();
     
     private MemoryMap mmu;
     
     public final Opcodes opcodes;
     
-    public final ConcurrentLinkedDeque<String> recentOps = new ConcurrentLinkedDeque<String>();
+    public final ConcurrentLinkedDeque<String> recentOps = new ConcurrentLinkedDeque<String>();         
+
     
     public Cpu(MemoryMap mmu){
         this.mmu = mmu;
@@ -36,6 +38,7 @@ public class Cpu {
     
     public void Reset(){
         reg.Reset();
+        cpp.Reset();
         clock.Reset();
         recentOps.clear();
         
@@ -97,6 +100,50 @@ public class Cpu {
         
         //Increment the clock
         int deltaM = clock.delM();
+        clock.Accept();
+        
+        //Interrupt handler
+        if(reg.ime() != 0 && mmu.i_enable != 0 && mmu.i_flags != 0){
+            //Mask off ints that arent enabled
+            int fired = mmu.i_enable & mmu.i_flags;
+            
+            //INTERRUPT TABLE-------------------------------
+            // Interrupt        ISR Address     Bit Value
+            // Vblank           0x40            0
+            // LCD stat         0x48            1
+            // Timer            0x50            2
+            // Serial           0x58            3
+            // Joypad Press     0x60            4   
+            //----------------------------------------------
+            
+            if((fired & 0x01) != 0){
+                //Vblank
+                mmu.i_flags &= 0xFE;
+                opcodes.RST_40h.Invoke();
+            }
+            if((fired & 0b10) != 0){
+                //LCD stat
+                //mmu.i_flags &= 0xFD;
+                //opcodes.RST_48h.Invoke();
+            }
+            if((fired & 0b100) != 0){
+                //Timer
+                //mmu.i_flags &= 0xFB;
+                //opcodes.RST_50h.Invoke();
+            }
+            if((fired & 0b1000) != 0){
+                //Serial
+                //mmu.i_flags &= 0xF7;
+                //opcodes.RST_58h.Invoke();
+            }
+            if((fired & 0b10000) != 0){
+                //Joypad press
+                //mmu.i_flags &= EF;
+                //opcodes.RST_60h.Invoke();
+            }
+        }
+        
+        //Increment the clock in case interrupt has fired
         clock.Accept();
         
         return deltaM;

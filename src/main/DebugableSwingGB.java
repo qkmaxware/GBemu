@@ -14,7 +14,6 @@ import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
-import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
@@ -33,8 +32,6 @@ import javax.swing.ListSelectionModel;
 import javax.swing.SwingConstants;
 import utilities.Debugger;
 import utilities.SpriteViewer;
-import utilities.SpriteViewer.Action;
-import utilities.Tests;
 import utilities.TileViewer;
 
 /**
@@ -42,19 +39,6 @@ import utilities.TileViewer;
  * @author Colin Halseth
  */
 public class DebugableSwingGB extends JFrame{
-    
-    private class RenderPanel extends JPanel{
-        public BufferedImage buff;
-        public RenderPanel(){
-            super();
-        }
-        public void paintComponent(Graphics g) {
-            Graphics2D g2 = (Graphics2D)g;
-            g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-            g2.drawImage(buff, 0, 0, this.getWidth(), this.getHeight(), null);
-            
-        }
-    }
     
     public final Gameboy gb;
     private Debugger debugger;
@@ -96,8 +80,7 @@ public class DebugableSwingGB extends JFrame{
         //Renderer
         JFrame renderer = new JFrame(){};
         renderer.setSize(Gpu.LCD_WIDTH, Gpu.LCD_HEIGHT);
-        RenderPanel renderContainer = new RenderPanel();
-        renderContainer.buff = this.gb.gpu.canvas.GetImage();
+        RenderPanel renderContainer = new RenderPanel(this.gb.gpu.canvas);
         renderer.add(renderContainer);
         this.gb.OnBufferReady(() -> {
             renderContainer.repaint();
@@ -129,6 +112,7 @@ public class DebugableSwingGB extends JFrame{
                 JList list = (JList)evt.getSource();
                 switch(evt.getClickCount()){
                     case 2:
+                        gb.Reset();
                         Cartridge cart = carts[list.locationToIndex(evt.getPoint())];
                         gb.LoadCartridge(cart);
                         renderer.setTitle("Playing: "+cart.toString());

@@ -19,6 +19,7 @@ import java.awt.RenderingHints;
 import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JTextField;
 
@@ -84,9 +85,24 @@ public class TileViewer extends JFrame{
             Refresh();
         });
         
+        JButton jumptp = new JButton("goto");
+        jumptp.addActionListener((evt) -> {
+            String res = JOptionPane.showInputDialog("Tile index");
+            try{
+                int i = Integer.parseInt(res);
+                if(i < 0 || i >= gpu.tilemap.length)
+                    throw new Exception("Index out of bounds");
+                selected = i;
+                Refresh();
+            }catch(Exception e){
+                JOptionPane.showMessageDialog(null, "Invalid tile index");
+            }
+        });
+        
         header.add(left);
         header.add(tileid);
         header.add(right);
+        header.add(jumptp);
         
         DrawPanel center = new DrawPanel();
         this.drawPanel = center;

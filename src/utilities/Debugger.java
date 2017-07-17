@@ -11,17 +11,24 @@ import gameboy.MemoryMap;
 import gameboy.cpu.Op;
 import gameboy.cpu.Registry;
 import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Component;
 import java.awt.Dimension;
+import java.awt.Font;
 import java.awt.GridLayout;
 import java.awt.Point;
 import java.awt.Rectangle;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import javax.swing.ButtonGroup;
 import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
+import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JPopupMenu;
 import javax.swing.JRadioButton;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
@@ -29,6 +36,7 @@ import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.JViewport;
 import javax.swing.table.AbstractTableModel;
+import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.TableModel;
 
 /**
@@ -63,7 +71,7 @@ public class Debugger extends JFrame{
     }
     
     private Table<String> memoryTable = new Table<String>(2);
-    private Table<String> registryTable = new Table<String>(2);
+    private Table<String> registryTable = new Table<String>(4);
     private MemoryMap mmu;
     private Registry reg;
     private Cpu cpu;
@@ -73,6 +81,8 @@ public class Debugger extends JFrame{
     private JTextArea logger;
     private JScrollPane logScroll;
     private JTable table;
+    
+    private ArrayList<Integer> breakpoints = new ArrayList<Integer>();
     
     public Debugger(Gameboy gb){
         this.setLayout(new BorderLayout());
@@ -106,7 +116,7 @@ public class Debugger extends JFrame{
             }
         };
         
-        String[] RegistryColumnNames = new String[]{"Register", "Value"};
+        String[] RegistryColumnNames = new String[]{"Register", "Value", "Register", "Value"};
         registryModel = new AbstractTableModel(){
             @Override
             public int getRowCount() {
@@ -132,10 +142,88 @@ public class Debugger extends JFrame{
             }
         };
         
+        DefaultTableCellRenderer  bold = new DefaultTableCellRenderer (){
+            public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
+                if (isSelected) {
+                    setBackground(table.getSelectionBackground());
+                    setForeground(table.getSelectionForeground());
+                }
+                else {
+                    setBackground(table.getBackground());
+                    setForeground(table.getForeground());
+                }
+                this.setValue(table.getValueAt(row, column));
+                this.setFont(this.getFont().deriveFont(Font.BOLD));
+                return this;
+            }
+        };
+        
+        final Color breakpointColor = Color.RED;
+        final Color breakpointSelectedColor = new Color(255, 0, 255);
+        
+        DefaultTableCellRenderer  boldAndBreakpoint = new DefaultTableCellRenderer (){
+            public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
+                
+                if (isSelected) {
+                    if(breakpoints.contains(row)){
+                        setBackground(breakpointSelectedColor);
+                    }else{
+                        setBackground(table.getSelectionBackground());
+                    }
+                    setForeground(table.getSelectionForeground());
+                }
+                else {
+                    if(breakpoints.contains(row)){
+                        setBackground(breakpointColor);
+                    }else{
+                        setBackground(table.getBackground());
+                    }
+                    setForeground(table.getForeground());
+                }
+                this.setValue(table.getValueAt(row, column));
+                this.setFont(this.getFont().deriveFont(Font.BOLD));
+                return this;
+            }
+        };
+        
         table = new JTable(memoryModel);
+        table.getColumnModel().getColumn(0).setCellRenderer(boldAndBreakpoint);
+        
+        table.addMouseListener(new MouseAdapter(){
+            @Override
+            public void mouseReleased(MouseEvent e) {
+                int rowindex = table.rowAtPoint(e.getPoint());
+                if (rowindex < 0)
+                    return;
+                if (e.isPopupTrigger() && e.getComponent() instanceof JTable ) {
+                    JPopupMenu popup = new JPopupMenu();
+                    JMenuItem breakpoint;
+                    if(breakpoints.contains(rowindex)){
+                        breakpoint = new JMenuItem("Remove Breakpoint");
+                        breakpoint.addActionListener((evt) -> {
+                            breakpoints.remove((Integer)rowindex);
+                            Refresh();
+                        });
+                    }else{
+                        breakpoint = new JMenuItem("Add Breakpoint");
+                        breakpoint.addActionListener((evt) -> {
+                            breakpoints.add(rowindex);
+                            Refresh();
+                        });
+                    }
+                    popup.add(breakpoint);
+                    popup.show(e.getComponent(), e.getX(), e.getY());
+                }
+            }
+        });
+        
+        
         this.add(new JScrollPane(table), BorderLayout.CENTER);
         
         JTable regTable = new JTable(registryModel);
+
+        regTable.getColumnModel().getColumn(0).setCellRenderer(bold);
+        regTable.getColumnModel().getColumn(2).setCellRenderer(bold);
         JScrollPane regScroll = new JScrollPane(regTable);
         regScroll.setPreferredSize(new Dimension(300, 120));
         
@@ -182,47 +270,33 @@ public class Debugger extends JFrame{
         button2.addActionListener((evt) -> {
             gb.Dispatch();
             Refresh();
+            jumpToRow(reg.pc());
             table.setRowSelectionInterval(reg.pc(), reg.pc());
         });
         
-        JButton button6 = new JButton("Breakpoint");
+        JButton button6 = new JButton("Breakpoint Step");
         button6.addActionListener((evt) -> {
-            JFrame breakpointframe = new JFrame();
-            JPanel brealpointpanel = new JPanel();
-            JTextField breakpointfield = new JTextField();
-            brealpointpanel.setLayout(new BorderLayout());
-            brealpointpanel.add(new JLabel("Address"), BorderLayout.NORTH);
-            brealpointpanel.add(breakpointfield, BorderLayout.CENTER);
-            JButton breakpointnext = new JButton("Next");
-            breakpointnext.addActionListener((evt2) -> {
-                //Run action in a whole new thread
-                Thread t = new Thread(){
-                    @Override
-                    public void run(){
-                        try{
-                            String r = breakpointfield.getText();
-                            int addr = Integer.parseInt(r,16);
-                            while(true){
-                                gb.Dispatch();
-                                if(reg.pc() == addr)
-                                    break;
-                            }
-                            Refresh();
-                            table.setRowSelectionInterval(addr, addr);
-                        }catch(Exception e){
-                            JOptionPane.showMessageDialog(null, "Bad address format");
+            //Run action in a whole new thread
+            Thread t = new Thread(){
+                @Override
+                public void run(){
+                    try{
+                        while(true){
+                            gb.Dispatch();
+                            if(breakpoints.contains(reg.pc()))
+                                break;
+                            //Thread.sleep(1);
                         }
+                        Refresh();
+                        jumpToRow(reg.pc());
+                        table.setRowSelectionInterval(reg.pc(), reg.pc());
+                    }catch(Exception e){
+                        JOptionPane.showMessageDialog(null, e);
+                        e.printStackTrace();
                     }
-                };
-                t.start();
-            });
-            brealpointpanel.add(breakpointnext, BorderLayout.SOUTH);
-            
-            breakpointframe.add(brealpointpanel);
-            breakpointframe.setSize(320, 120);
-            breakpointframe.setTitle("Breakpoint Browser");
-            breakpointframe.setVisible(true);
-            
+                }
+            };
+            t.start();
         });
         
         JButton button3 = new JButton("Inject");
@@ -270,7 +344,6 @@ public class Debugger extends JFrame{
                         b = Integer.parseInt(value.getText(), 2);
                     }
                    
-                    System.out.println("Trying to put "+b+" into "+a);
                     mmu.wb(a, b);
                     int c = mmu.rb(a);
                     if(c != b)
@@ -299,19 +372,20 @@ public class Debugger extends JFrame{
             String r = JOptionPane.showInputDialog(null, "Select address to scroll to");
             try{
                 int i = Integer.parseInt(r, 16);
-                System.out.println("jump to "+i);
-                Rectangle rect = table.getCellRect(i, 0, true);
-                Point pt = ((JViewport)table.getParent()).getViewPosition();
-                rect.setLocation(rect.x - pt.x, rect.y - pt.y);
-                table.scrollRectToVisible(rect);
-                table.setRowSelectionInterval(i, i);
+                jumpToRow(i);
             }catch(Exception e){
                 JOptionPane.showMessageDialog(null, "Bad address format");
             }
         });
+        
+        JButton button7 = new JButton("Goto PC");
+        button7.addActionListener((evt) -> {
+            jumpToRow(reg.pc());
+        });
          
         panelheader.add(displayMode);
         footer.add(button);
+        footer.add(button7);
         footer.add(button5);
         footer.add(button2);
         footer.add(button6);
@@ -322,6 +396,14 @@ public class Debugger extends JFrame{
         this.add(panelheader, BorderLayout.NORTH);
         
         this.setTitle("Debugger");
+    }
+    
+    public void jumpToRow(int i){
+        Rectangle rect = table.getCellRect(i, 0, true);
+        Point pt = ((JViewport)table.getParent()).getViewPosition();
+        rect.setLocation(rect.x - pt.x, rect.y - pt.y);
+        ((JViewport)table.getParent()).scrollRectToVisible(rect);
+        table.setRowSelectionInterval(i, i);
     }
     
     public void Refresh(){
@@ -335,6 +417,8 @@ public class Debugger extends JFrame{
             }else{
                 row = memoryTable.GetRow(i);
             }
+            
+            
             row.set(0, String.format("%04X", i));
             switch(displayMode){
                 case 0:
@@ -345,7 +429,23 @@ public class Debugger extends JFrame{
                     break;
                 case 2:
                     Op op = this.cpu.opcodes.Fetch(mmu.rb(i));
-                    row.set(1, op!=null ? op.toString() : ""+mmu.rb(i));
+                    //For multi-byte opcodes
+                    int n = 0; int nn = 0;
+                    if(i <= mmu.MaxAddress() - 1)
+                        n = mmu.rb(i+1);
+                    if(i <= mmu.MaxAddress() - 2)
+                        nn = (mmu.rb(i+2) << 8) | mmu.rb(i+1);
+                    
+                    String str;
+                    if(op != null){
+                        str = op.toString();
+                        str = str.replace("nn", String.format("0x%X", nn));
+                        str = str.replace("n", String.format("0x%X", n));
+                    }else{
+                        str = ""+mmu.rb(i);
+                    }
+                    
+                    row.set(1, str);
                     break;
             }            
         }
@@ -360,45 +460,51 @@ public class Debugger extends JFrame{
         registryTable.GetRow(0).set(0, "PC");
         registryTable.GetRow(0).set(1, String.format(largeformat, reg.pc()));
         
-        registryTable.GetRow(1).set(0, "SP");
-        registryTable.GetRow(1).set(1, String.format(largeformat, reg.sp()));
+        registryTable.GetRow(0).set(2, "SP");
+        registryTable.GetRow(0).set(3, String.format(largeformat, reg.sp()));
         
-        registryTable.GetRow(2).set(0, "A");
-        registryTable.GetRow(2).set(1, String.format(smallformat,reg.a()));
+        registryTable.GetRow(1).set(0, "A");
+        registryTable.GetRow(1).set(1, String.format(smallformat,reg.a()));
         
-        registryTable.GetRow(3).set(0, "F (flags)");
-        registryTable.GetRow(2).set(1, String.format(smallformat,reg.f()));
+        registryTable.GetRow(1).set(2, "F (flags)");
+        registryTable.GetRow(1).set(3, String.format(smallformat,reg.f()));
         
-        registryTable.GetRow(4).set(0, "B");
-        registryTable.GetRow(4).set(1, String.format(smallformat,reg.b()));
+        registryTable.GetRow(2).set(0, "B");
+        registryTable.GetRow(2).set(1, String.format(smallformat,reg.b()));
         
-        registryTable.GetRow(5).set(0, "C");
-        registryTable.GetRow(5).set(1, String.format(smallformat,reg.c()));
+        registryTable.GetRow(2).set(2, "C");
+        registryTable.GetRow(2).set(3, String.format(smallformat,reg.c()));
         
-        registryTable.GetRow(6).set(0, "D");
-        registryTable.GetRow(6).set(1, String.format(smallformat,reg.d()));
+        registryTable.GetRow(3).set(0, "D");
+        registryTable.GetRow(3).set(1, String.format(smallformat,reg.d()));
         
-        registryTable.GetRow(7).set(0, "E");
-        registryTable.GetRow(7).set(1, String.format(smallformat,reg.e()));
+        registryTable.GetRow(3).set(2, "E");
+        registryTable.GetRow(3).set(3, String.format(smallformat,reg.e()));
         
-        registryTable.GetRow(8).set(0, "H");
-        registryTable.GetRow(8).set(1, String.format(smallformat,reg.h()));
+        registryTable.GetRow(4).set(0, "H");
+        registryTable.GetRow(4).set(1, String.format(smallformat,reg.h()));
         
-        registryTable.GetRow(9).set(0, "L");
-        registryTable.GetRow(9).set(1, String.format(smallformat, reg.l()));
+        registryTable.GetRow(4).set(2, "L");
+        registryTable.GetRow(4).set(3, String.format(smallformat, reg.l()));
         
         //Spacer
-        registryTable.GetRow(10).set(0, "");
-        registryTable.GetRow(10).set(1, "");
+        registryTable.GetRow(5).set(0, "");
+        registryTable.GetRow(5).set(1, "");
         
-        registryTable.GetRow(11).set(0, "IME");
-        registryTable.GetRow(11).set(1, String.format(smallformat, reg.ime()));
+        registryTable.GetRow(6).set(0, "IME");
+        registryTable.GetRow(6).set(1, String.format(smallformat, reg.ime()));
         
-        registryTable.GetRow(12).set(0, "IE");
-        registryTable.GetRow(12).set(1, String.format(smallformat, mmu.rb(0xFFFF)));
+        registryTable.GetRow(6).set(2, "LCDC");
+        registryTable.GetRow(6).set(3, String.format(smallformat, mmu.rb(0xFF40)));
         
-        registryTable.GetRow(13).set(0, "IF");
-        registryTable.GetRow(13).set(1, String.format(smallformat, mmu.rb(0xFF0F)));
+        registryTable.GetRow(7).set(0, "IE");
+        registryTable.GetRow(7).set(1, String.format(smallformat, mmu.rb(0xFFFF)));
+        
+        registryTable.GetRow(7).set(2, "LCD STAT");
+        registryTable.GetRow(7).set(3, String.format(smallformat, mmu.rb(0xFF41)));
+        
+        registryTable.GetRow(8).set(0, "IF");
+        registryTable.GetRow(8).set(1, String.format(smallformat, mmu.rb(0xFF0F)));
         
         
         ((AbstractTableModel)memoryModel).fireTableDataChanged();
