@@ -16,11 +16,13 @@ import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.GridLayout;
 import java.awt.RenderingHints;
+import javax.swing.ButtonGroup;
 import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JRadioButton;
 import javax.swing.JTextField;
 
 /**
@@ -43,8 +45,11 @@ public class TileViewer extends JFrame{
     private Gpu gpu;
     private int selected =0;
     private Bitmap bmp = new Bitmap(8,8);
+    private Bitmap all = new Bitmap(15*8, 17*8); //255 Tiles per base 0x0000, 0x0800
+    private int base = 0;
     
     private JPanel drawPanel;
+    private JPanel allPanel;
     
     private JTextField tileid;
     
@@ -61,7 +66,6 @@ public class TileViewer extends JFrame{
         this.setSize(400,340);
         
         JPanel header = new JPanel();
-        this.add(header, BorderLayout.NORTH);
         
         JButton left = new JButton("<");
         left.addActionListener((evt) -> {
@@ -106,7 +110,6 @@ public class TileViewer extends JFrame{
         
         DrawPanel center = new DrawPanel();
         this.drawPanel = center;
-        this.add(center, BorderLayout.CENTER);
         center.draw = (g2) -> {
             g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
             g2.drawImage(bmp.GetImage(), 0, 0, center.getWidth(), center.getHeight(), null);
@@ -116,14 +119,44 @@ public class TileViewer extends JFrame{
         refresh.addActionListener((evt) -> {
             Refresh();
         });
+        
+        JPanel leftPanel = new JPanel();
+        leftPanel.setLayout(new BorderLayout());
+        leftPanel.add(center, BorderLayout.CENTER);
+        leftPanel.add(header, BorderLayout.NORTH);
         this.add(refresh, BorderLayout.SOUTH);
+        
+        JPanel rightPanel = new JPanel();
+        rightPanel.setLayout(new BorderLayout());
+        DrawPanel allpanel = new DrawPanel();
+        allPanel = allpanel;
+        rightPanel.add(allpanel, BorderLayout.CENTER);
+        allpanel.draw = (g2) -> {
+            g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+            g2.drawImage(all.GetImage(), 0, 0, allpanel.getWidth(), allpanel.getHeight(), null);
+        };
+        
+        JRadioButton b8000 = new JRadioButton("0x8000");
+        JRadioButton b8800 = new JRadioButton("0x8800");
+        ButtonGroup group = new ButtonGroup();
+        b8000.addActionListener((evt) -> {base=0; Refresh();});
+        b8800.addActionListener((evt) -> {base=1; Refresh();});
+        group.add(b8000); group.add(b8800);
+        JPanel ft = new JPanel();
+        ft.add(new JLabel("Charbase"));
+        ft.add(b8000);
+        ft.add(b8800);
+        rightPanel.add(ft, BorderLayout.NORTH);
+        
+        this.add(leftPanel, BorderLayout.WEST);
+        this.add(rightPanel, BorderLayout.CENTER);
     }
     
     public void Refresh(){
         tileid.setText(String.valueOf(this.selected));
         
+        //Refresh this specific tyle
         int[][] tile = gpu.tilemap[this.selected];
-        
         for(int y = 0; y < 8; y++){
             for(int x = 0; x < 8; x++){
                 int c = tile[y][x];
@@ -146,7 +179,42 @@ public class TileViewer extends JFrame{
             }
         }
         
+        //Refresh all tiles map
+        int lx = 0; int ly = 0;
+        for(int i = 0; i < 255; i++){
+            int[][] tiledata = gpu.tilemap[base*255 + i];
+            for(int y = 0; y < 8; y++){
+                for(int x = 0; x < 8; x++){
+                    int drawX = lx+x;
+                    int drawY = ly+y;
+                    int color = tiledata[y][x];
+                    Color cl;
+                    switch(color){
+                        case 0: 
+                            cl = Color.WHITE;
+                            break;
+                        case 1: 
+                            cl = Color.LIGHT_GRAY;
+                            break;
+                        case 2:
+                            cl = Color.DARK_GRAY;
+                            break;
+                        default:
+                            cl = Color.BLACK;
+                            break;
+                    }
+                    all.SetColor(drawX, drawY, cl);
+                }
+            }
+            lx+=8;
+            if(lx >= 15*8) {
+                lx = 0;
+                ly+=8;
+            }
+        }
+        
         drawPanel.repaint();
+        allPanel.repaint();
     }
     
 }

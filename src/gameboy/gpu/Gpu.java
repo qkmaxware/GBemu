@@ -9,6 +9,7 @@ import gameboy.IMemory;
 import gameboy.Listener;
 import gameboy.MemoryMap;
 import java.awt.Color;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -73,10 +74,10 @@ public class Gpu implements IMemory{
     private int clock = 0;
     
     public boolean windowon = true;
-    public boolean lcdon = true;
+    public boolean lcdon = false;
     public boolean largeobj = false;
-    public boolean objon = true;
-    public boolean bgon = true;
+    public boolean objon = false;
+    public boolean bgon = false;
     public boolean coincidenceInterruptEnable = false;
     public boolean oamInterruptEnable = false;
     public boolean vblankInterruptEnable = false;
@@ -286,7 +287,8 @@ public class Gpu implements IMemory{
                 canvas.SetColor(x, y, c);
             }
         }
-        System.out.println("Vblank");
+        
+        System.out.println("VBLANK");
         
         if(this.OnVBlank != null){
             this.OnVBlank.OnEvent();
@@ -332,10 +334,10 @@ public class Gpu implements IMemory{
         xwindow = 0;
         
         windowon = true;
-        lcdon = true;
+        lcdon = false;
         largeobj = false;
-        objon = true;
-        bgon = true;
+        objon = false;
+        bgon = false;
     
         windowtile = false;
         tiledatatable = false;
@@ -352,7 +354,7 @@ public class Gpu implements IMemory{
         vblankInterruptEnable = false;
         hblankInterruptEnable = false;
 
-        reg.put(0xFF41, 0b10000000);
+        reg.put(0xFF41, 0b10000000 | getLcdStatus());
     }
     
     protected void updatetile(int addr, int value){
@@ -441,7 +443,7 @@ public class Gpu implements IMemory{
             result |= 0b10000000;
         }
         
-        return result;
+        return (curline == lyc ? 4 : 0) | gpumode; //Instead of result. See jsGB
     }
     
     private void setLcdStatus(int value){
@@ -562,7 +564,6 @@ public class Gpu implements IMemory{
                 bgon = (value&0x01) != 0;                       //BIT 0 - BG Display (0=off, 1=on)
                 break;
             case 0xFF41:    //LCD Status
-                System.out.println("LCD set to "+value);
                 setLcdStatus(value);
                 break;
             case 0xFF42:    //Scroll Y         

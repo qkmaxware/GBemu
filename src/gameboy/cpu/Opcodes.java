@@ -2976,7 +2976,7 @@ public class Opcodes {
         //Next inst to stack
         reg.sppp(-2);
         int next = reg.pc() + 2;
-        mmu.wb(reg.sp(), next);
+        mmu.ww(reg.sp(), next);
         
         //Jump to immediate value
         int jp = mmu.rw(reg.pc());
@@ -2992,7 +2992,7 @@ public class Opcodes {
              //Next inst to stack
             reg.sppp(-2);
             int next = reg.pc() + 2;
-            mmu.wb(reg.sp(), next);
+            mmu.ww(reg.sp(), next);
             
             //Jump to immediate value
             int jp = mmu.rw(reg.pc());
@@ -3011,7 +3011,7 @@ public class Opcodes {
              //Next inst to stack
             reg.sppp(-2);
             int next = reg.pc() + 2;
-            mmu.wb(reg.sp(), next);
+            mmu.ww(reg.sp(), next);
             
             //Jump to immediate value
             int jp = mmu.rw(reg.pc());
@@ -3030,7 +3030,7 @@ public class Opcodes {
              //Next inst to stack
             reg.sppp(-2);
             int next = reg.pc() + 2;
-            mmu.wb(reg.sp(), next);
+            mmu.ww(reg.sp(), next);
             
             //Jump to immediate value
             int jp = mmu.rw(reg.pc());
@@ -3049,7 +3049,7 @@ public class Opcodes {
              //Next inst to stack
             reg.sppp(-2);
             int next = reg.pc() + 2;
-            mmu.wb(reg.sp(), next);
+            mmu.ww(reg.sp(), next);
             
             //Jump to immediate value
             int jp = mmu.rw(reg.pc());

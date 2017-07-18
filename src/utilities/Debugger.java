@@ -439,8 +439,8 @@ public class Debugger extends JFrame{
                     String str;
                     if(op != null){
                         str = op.toString();
-                        str = str.replace("nn", String.format("0x%X", nn));
-                        str = str.replace("n", String.format("0x%X", n));
+                        str = str.replace("nn", String.format("%X", nn));
+                        str = str.replace("n", String.format("%X", n));
                     }else{
                         str = ""+mmu.rb(i);
                     }
@@ -505,6 +505,10 @@ public class Debugger extends JFrame{
         
         registryTable.GetRow(8).set(0, "IF");
         registryTable.GetRow(8).set(1, String.format(smallformat, mmu.rb(0xFF0F)));
+        
+        registryTable.GetRow(8).set(2, "LY");
+        registryTable.GetRow(8).set(3, String.format(smallformat, mmu.rb(0xFF44)));
+        
         
         
         ((AbstractTableModel)memoryModel).fireTableDataChanged();
