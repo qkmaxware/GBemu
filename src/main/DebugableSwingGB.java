@@ -144,7 +144,7 @@ public class DebugableSwingGB extends JFrame{
     }
     
     public static Cartridge[] GetLocalCartridges(){
-        File dir = new File(".");
+        File dir = new File("./roms/");
         File[] files = dir.listFiles(new FilenameFilter() {
             @Override
             public boolean accept(File dir, String name) {
