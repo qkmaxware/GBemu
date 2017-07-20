@@ -85,7 +85,7 @@ public class Registry {
 
     public void f(int i) {
         //Last 4 digits are always 0 even if one is written to
-        flags = i & Metrics.BIT8 & 0b11110000;
+        flags = (i & Metrics.BIT8) & 0b11110000;
     }
     
     /*
@@ -196,8 +196,8 @@ public class Registry {
     
     public void af(int i){
         //TODO the proper way to do this?
-        flags = i & Metrics.BIT8;
-        a = (i >> 8) & Metrics.BIT8;
+        f(i);
+        a(i >> 8);
     }
     
     public int bc(){
@@ -208,8 +208,8 @@ public class Registry {
     
     public void bc(int i){
         //TODO the proper way to do this?
-        c = i & Metrics.BIT8;
-        b = (i >> 8) & Metrics.BIT8;
+        c(i);
+        b(i >> 8);
     }
     
     public int de(){
@@ -220,8 +220,8 @@ public class Registry {
     
     public void de(int i){
         //TODO the proper way to do this?
-        e = i & Metrics.BIT8;
-        d = (i >> 8) & Metrics.BIT8;
+        e(i);
+        d(i >> 8);
     }
    
     public int hl(){
@@ -232,7 +232,16 @@ public class Registry {
 
     public void hl(int i){
         //TODO the proper way to do this?
-        low = i & Metrics.BIT8;
-        high = (i >> 8) & Metrics.BIT8;
+        l(i);
+        h(i >> 8);
+    }
+    
+    public String toString(){
+        return "PC: "+String.format("0x%04X", this.pc)+
+                ", SP: "+String.format("0x%04X", this.sp)+
+                ", AF: "+String.format("0x%02X", this.a) + String.format("%02X", this.flags)+
+                ", BC: "+String.format("0x%02X", this.b) + String.format("%02X", this.c)+
+                ", DE: "+String.format("0x%02X", this.d) + String.format("%02X", this.e)+
+                ", HL: "+String.format("0x%02X", this.high) + String.format("%02X", this.low);
     }
 }

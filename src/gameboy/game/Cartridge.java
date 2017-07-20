@@ -5,13 +5,15 @@
  */
 package gameboy.game;
 
+import java.io.File;
+
 /**
  *
  * @author Colin Halseth
  */
 public class Cartridge{
 
-
+    public File source;
     public final RomInfo info;
     private int[] rom;
     
@@ -21,7 +23,7 @@ public class Cartridge{
     }
     
     public String toString(){
-        return info.title;
+        return (source == null ? info.title : source.getName());
     }
     
     public int read(int addr){

@@ -12,6 +12,9 @@ import gameboy.cpu.Cpu;
 import gameboy.game.CartridgeAdapter;
 import gameboy.gpu.Gpu;
 import gameboy.io.Timer;
+import gameboy.serial.SerialConnection;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
 
 /**
  *
@@ -35,6 +38,7 @@ public class Gameboy {
         input = new Input();
         timer = new Timer();
         adapter = new CartridgeAdapter();
+        SerialConnection sysio = new SerialConnection(new InputStreamReader(System.in), new OutputStreamWriter(System.out));
         
         mmu.Set(MemoryMap.INTERNAL_RAM, onboard);
         mmu.Set(MemoryMap.ZRAM, onboard);
@@ -49,6 +53,8 @@ public class Gameboy {
         mmu.Set(MemoryMap.ROM_BANK_0, adapter);
         mmu.Set(MemoryMap.ROM_BANK_1, adapter);
         mmu.Set(MemoryMap.EXTERNAL_RAM, adapter);
+        
+        mmu.Set(MemoryMap.SERIALIO, sysio);
         
         cpu = new Cpu(mmu);
         
@@ -81,11 +87,16 @@ public class Gameboy {
     public void Dispatch(){
         //Step the cpu
         int deltaTime = cpu.Step();
+        //System.out.println(this);
         
         //Step the gpu
         gpu.Step(deltaTime);
         
         //Step the timer
         timer.Increment(deltaTime);
+    }
+    
+    public String toString(){
+        return cpu.recentOps.getLast().toString() + " WITH "+ cpu.reg.toString();
     }
 }

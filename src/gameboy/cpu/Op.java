@@ -19,6 +19,10 @@ public class Op {
    private String name;
    private Action action;
    
+   public Op(int hex, String name, Action action){
+       this(hex, name, null, action);
+   }
+   
    public Op(int hex, String name, Op[] mapping, Action action){
         this.hex = hex;
         this.name = name;

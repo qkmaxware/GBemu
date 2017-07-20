@@ -9,7 +9,6 @@ import gameboy.IMemory;
 import gameboy.Listener;
 import gameboy.MemoryMap;
 import java.awt.Color;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -288,7 +287,7 @@ public class Gpu implements IMemory{
             }
         }
         
-        System.out.println("VBLANK");
+        //System.out.println("VBLANK");
         
         if(this.OnVBlank != null){
             this.OnVBlank.OnEvent();
@@ -367,8 +366,6 @@ public class Gpu implements IMemory{
         int tile = (addr >> 4) & 511;
         int y = (addr >> 1) & 7;
         
-        //System.out.println("Update tile "+tile);
-        
         int sx;
         for(int x = 0; x < 8; x++){
             sx = 1 << (7 - x);
@@ -383,8 +380,6 @@ public class Gpu implements IMemory{
         if (obj > 40 || obj < 0) {
             return;
         }
-        
-        //System.out.println("Update sprite "+obj);
         
         switch (addr & 3) {
             case 0:
@@ -440,10 +435,10 @@ public class Gpu implements IMemory{
         }
         //What about bit 7?
         if(reg.containsKey(0xFF41)){    //Preserve saved bit 7
-            result |= 0b10000000;
+            result |= reg.get(0xFF41) & 0b10000000;
         }
         
-        return (curline == lyc ? 4 : 0) | gpumode; //Instead of result. See jsGB
+        return result; //(curline == lyc ? 4 : 0) | gpumode; //Instead of result. See jsGB
     }
     
     private void setLcdStatus(int value){
@@ -512,7 +507,7 @@ public class Gpu implements IMemory{
                         (windowon ? 0x20 : 0) |
                         (windowtile? (0x40) : 0);
             case 0xFF41:    //LCD Status
-                    return getLcdStatus();
+                return getLcdStatus();
             case 0xFF42:    //Scroll Y         
                 return yscroll;
             case 0xFF43:    //Scroll X         

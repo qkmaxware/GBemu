@@ -42,6 +42,7 @@ public class MemoryMap{
     public static final int ZRAM = 7;
     public static final int JOYSTICK = 9;
     public static final int TIMER = 10;
+    public static final int SERIALIO = 8;
     
     private IMemory[] ctrl = new IMemory[11];
     public int i_enable = 0;    //Which interupts are enabled
@@ -121,7 +122,7 @@ public class MemoryMap{
     }
     
     public int rw(int addr){
-        return rb(addr) + (rb(addr + 1) << 8);
+        return (rb(addr + 1) << 8) | rb(addr);
     }
     
     public void wb(int addr, int value){
@@ -158,7 +159,10 @@ public class MemoryMap{
            ctrl[JOYSTICK].wb(addr, value);
        }
        else if(in(addr, 0xFF01, 0xFF03)){
-           //Serial IO Data, Control, UNKNOWN
+           if(addr == 0xFF01 && ctrl[SERIALIO] != null){ //Serial IO Data
+               ctrl[SERIALIO].wb(addr, value);
+           }
+           //Control, UNKNOWN
        }
        else if(in(addr, 0xFF04, 0xFF0E)){
            //Timer

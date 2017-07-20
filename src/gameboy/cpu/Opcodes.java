@@ -38,6 +38,8 @@ public class Opcodes {
                 count.add(i);
                 Op XX = new Op(i, "XX", null, () -> {
                     System.out.println("Unimplemented opcode called at "+(reg.pc() - 1)+" with opcode "+mmu.rb((reg.pc() - 1)));
+                    clock.m(1);
+                    clock.t(4);
                 });
                 map[i] = XX;
             }
@@ -45,6 +47,8 @@ public class Opcodes {
                 ccount.add(i);
                 Op XX = new Op(i, "XX", null, () -> {
                     System.out.println("Unimplemented cb-opcode called at "+(reg.pc() - 1)+" with opcode CB:"+mmu.rb((reg.pc() - 1)));
+                    clock.m(1);
+                    clock.t(4);
                 });
                 cbmap[i] = XX;
             }
@@ -73,7 +77,7 @@ public class Opcodes {
     
     public Op Fetch(int opcode){
         if(!isValidOpcode(opcode))
-            return null;
+            throw new RuntimeException("Opcode is not valid at: "+reg.pc());
         Op op = this.map[opcode];
         return op; 
     }
@@ -144,7 +148,7 @@ public class Opcodes {
     
     //No operation
     Op NOP = new Op(0x00, "NOP", map, () -> {
-        clock.m(1);
+        clock.m(1); //Actual machine time
         clock.t(4); //Number of cycles taken
     });
 
@@ -949,9 +953,10 @@ public class Opcodes {
     
     //Pop value off stack into register AF
     Op POP_AF = new Op(0xF1, "POP AF", map, () -> {
-        int v = mmu.rw(reg.sp()); //TODO confirm if this is the same as sp-- wb(h) sp-- wb(l)
+        int v = mmu.rw(reg.sp()); 
         reg.af(v);
         reg.sppp(2);
+                
         clock.m(3);
         clock.t(12);
     });
@@ -2482,8 +2487,8 @@ public class Opcodes {
         int v = reg.bc() + 1;
         reg.bc(v);
         
-        clock.m(2);
-        clock.t(8);
+        clock.m(1);
+        clock.t(4);
     });
     
     //Increment the register DE
@@ -2491,8 +2496,8 @@ public class Opcodes {
         int v = reg.de() + 1;
         reg.de(v);
         
-        clock.m(2);
-        clock.t(8);
+        clock.m(1);
+        clock.t(4);
     });
     
     //Increment the register HL
@@ -2675,17 +2680,26 @@ public class Opcodes {
     
     //Adjust register A so that the correct represnetation of a binary coded decimal is obtained
     Op DAA = new Op(0x27, "DAA", map, () -> {
-        //TODO wtf is this
         int a = reg.a();
-        if(reg.halfcarry() || (reg.a() & 15) > 9)
-            reg.a(reg.a() + 6);
-        reg.carry(false);
-        if(reg.halfcarry() || a > 0x99){
-            reg.a(reg.a() + 0x60);
-            reg.carry(true);
+        
+        if(!reg.subtract()){
+            if(reg.halfcarry() || (a & 0xF) > 9)
+                a += 0x06;
+            
+            if(reg.carry() || a > 0x9F)
+                a += 0x60;
+        }else{
+            if(reg.halfcarry())
+                a = (a - 0x6) & 0xFF;
+            
+            if(reg.carry())
+                a = (a - 0x60) & 0xFF;
         }
         
-        reg.zero(isZero(reg.a()));
+        reg.a(a);
+        
+        reg.zero(isZero(a));
+        reg.carry((a & 0x100) == 0x100);
         reg.halfcarry(false);
         
         clock.m(1);
@@ -2832,6 +2846,8 @@ public class Opcodes {
         
         if(!reg.zero()){
             reg.pc(nn); //Maybe clock.m++;
+            clock.m(1);
+            clock.t(4);
         }else
             reg.pcpp(2);
         
@@ -2845,6 +2861,8 @@ public class Opcodes {
         
         if(reg.zero()){
             reg.pc(nn); //Maybe clock.m++;
+            clock.m(1);
+            clock.t(4);
         }else
             reg.pcpp(2);
         
@@ -2858,6 +2876,8 @@ public class Opcodes {
         
         if(!reg.carry()){
             reg.pc(nn); //Maybe clock.m++;
+            clock.m(1);
+            clock.t(4);
         }else
             reg.pcpp(2);
         
@@ -2871,6 +2891,8 @@ public class Opcodes {
         
         if(reg.carry()){
             reg.pc(nn); //Maybe clock.m++;
+            clock.m(1);
+            clock.t(4);
         }else
             reg.pcpp(2);
         
@@ -2959,6 +2981,8 @@ public class Opcodes {
         
         if(reg.carry()){
             reg.pc(reg.pc() + i);
+            clock.m(1);
+            clock.t(4);
         }
         
         clock.m(2);
@@ -2982,8 +3006,8 @@ public class Opcodes {
         int jp = mmu.rw(reg.pc());
         reg.pc(jp);
         
-        clock.m(3);
-        clock.t(12);
+        clock.m(5);
+        clock.t(24);
     });
     
     //Call address n if the condtion is true
@@ -2997,6 +3021,9 @@ public class Opcodes {
             //Jump to immediate value
             int jp = mmu.rw(reg.pc());
             reg.pc(jp);
+            
+            clock.m(2);
+            clock.t(8);
         }else{
             reg.pcpp(2);
         }
@@ -3016,6 +3043,9 @@ public class Opcodes {
             //Jump to immediate value
             int jp = mmu.rw(reg.pc());
             reg.pc(jp);
+            
+            clock.m(2);
+            clock.t(8);
         }else{
             reg.pcpp(2);
         }
@@ -3035,6 +3065,9 @@ public class Opcodes {
             //Jump to immediate value
             int jp = mmu.rw(reg.pc());
             reg.pc(jp);
+            
+            clock.m(2);
+            clock.t(8);
         }else{
             reg.pcpp(2);
         }
@@ -3054,6 +3087,9 @@ public class Opcodes {
             //Jump to immediate value
             int jp = mmu.rw(reg.pc());
             reg.pc(jp);
+            
+            clock.m(2);
+            clock.t(8);
         }else{
             reg.pcpp(2);
         }
@@ -3068,92 +3104,54 @@ public class Opcodes {
     // Restarts
     ///
     
-    //Push present address onto stack and jump to 0x0000 + n
-    Op RST_00h = new Op(0xC7, "RST 00H", map, () -> {
+    private void rst(int loc){
         rsv(); //TODO //Save registry to backup
         reg.sppp(-2);
         mmu.wb(reg.sp(), reg.pc());
-        reg.pc(0x00);
+        reg.pc(loc);
         
-        clock.m(3); //Maybe 8 and 32
+        clock.m(3); //Maybe 8 and 32 or 4 or something
         clock.t(12);
+    }
+    
+    //Push present address onto stack and jump to 0x0000 + n
+    Op RST_00h = new Op(0xC7, "RST 00H", map, () -> {
+        rst(0x00);
     });
     
     //Push present address onto stack and jump to 0x0000 + n
     Op RST_08h = new Op(0xCF, "RST 08H", map, () -> {
-        rsv();
-        reg.sppp(-2);
-        mmu.wb(reg.sp(), reg.pc());
-        reg.pc(0x08);
-        
-        clock.m(3); //Maybe 8 and 32
-        clock.t(12);
+        rst(0x08);
     });
     
     //Push present address onto stack and jump to 0x0000 + n
     Op RST_10h = new Op(0xD7, "RST 10H", map, () -> {
-        rsv();
-        reg.sppp(-2);
-        mmu.wb(reg.sp(), reg.pc());
-        reg.pc(0x10);
-        
-        clock.m(3); //Maybe 8 and 32
-        clock.t(12);
+        rst(0x10);
     });
     
     //Push present address onto stack and jump to 0x0000 + n
     Op RST_18h = new Op(0xDF, "RST 18H", map, () -> {
-        rsv();
-        reg.sppp(-2);
-        mmu.wb(reg.sp(), reg.pc());
-        reg.pc(0x18);
-        
-        clock.m(3); //Maybe 8 and 32
-        clock.t(12);
+        rst(0x18);
     });
     
     //Push present address onto stack and jump to 0x0000 + n
     Op RST_20h = new Op(0xE7, "RST 20H", map, () -> {
-        rsv();
-        reg.sppp(-2);
-        mmu.wb(reg.sp(), reg.pc());
-        reg.pc(0x20);
-        
-        clock.m(3); //Maybe 8 and 32
-        clock.t(12);
+        rst(0x20);
     });
     
     //Push present address onto stack and jump to 0x0000 + n
     Op RST_28h = new Op(0xEF, "RST 28H", map, () -> {
-        rsv();
-        reg.sppp(-2);
-        mmu.wb(reg.sp(), reg.pc());
-        reg.pc(0x28);
-        
-        clock.m(3); //Maybe 8 and 32
-        clock.t(12);
+        rst(0x28);
     });
     
     //Push present address onto stack and jump to 0x0000 + n
     Op RST_30h = new Op(0xF7, "RST 30H", map, () -> {
-        rsv();
-        reg.sppp(-2);
-        mmu.wb(reg.sp(), reg.pc());
-        reg.pc(0x30);
-        
-        clock.m(3); //Maybe 8 and 32
-        clock.t(12);
+        rst(0x30);
     });
     
     //Push present address onto stack and jump to 0x0000 + n
     Op RST_38h = new Op(0xFF, "RST 38H", map, () -> {
-        rsv();
-        reg.sppp(-2);
-        mmu.wb(reg.sp(), reg.pc());
-        reg.pc(0x38);
-        
-        clock.m(3); //Maybe 8 and 32
-        clock.t(12);
+        rst(0x38);
     });
     
     ///
@@ -3161,15 +3159,23 @@ public class Opcodes {
     ///
     
     public Op RST_40h = new Op(0xFF1, "RST 40H", null, () -> {
-        rsv();
-        reg.ime(0); //Disable further interrupts
-        
-        reg.sppp(-2);
-        mmu.wb(reg.sp(), reg.pc());
-        reg.pc(0x40);
-        
-        clock.m(3); //Maybe 3 and 12
-        clock.t(12);
+        rst(0x40);
+    });
+    
+    public Op RST_48h = new Op(0xFF2, "RST 48H", null, () -> {
+        rst(0x48);
+    });
+    
+    public Op RST_50h = new Op(0xFF3, "RST 50H", null, () -> {
+        rst(0x50);
+    });
+    
+    public Op RST_58h = new Op(0xFF4, "RST 58H", null, () -> {
+        rst(0x58);
+    });
+    
+    public Op RST_60h = new Op(0xFF5, "RST 60H", null, () -> {
+        rst(0x60);
     });
     
     //PAGE 117
@@ -3183,8 +3189,8 @@ public class Opcodes {
         reg.pc(mmu.rw(reg.sp()));
         reg.sppp(2);
         
-        clock.m(2);
-        clock.t(8);
+        clock.m(3);
+        clock.t(12);
     });
     
     //Return if Z flag is reset
@@ -3192,8 +3198,8 @@ public class Opcodes {
         if(!reg.zero()){
             reg.pc(mmu.rw(reg.sp()));
             reg.sppp(2);
-            clock.m(2);
-            clock.t(8);
+            clock.m(3);
+            clock.t(12);
         }else{
             clock.m(1);
             clock.t(4);
@@ -3205,8 +3211,8 @@ public class Opcodes {
         if(reg.zero()){
             reg.pc(mmu.rw(reg.sp()));
             reg.sppp(2);
-            clock.m(2);
-            clock.t(8);
+            clock.m(3);
+            clock.t(12);
         }else{
             clock.m(1);
             clock.t(4);
@@ -3218,8 +3224,8 @@ public class Opcodes {
         if(!reg.carry()){
             reg.pc(mmu.rw(reg.sp()));
             reg.sppp(2);
-            clock.m(2);
-            clock.t(8);
+            clock.m(3);
+            clock.t(12);
         }else{
             clock.m(1);
             clock.t(4);
@@ -3231,8 +3237,8 @@ public class Opcodes {
         if(reg.carry()){
             reg.pc(mmu.rw(reg.sp()));
             reg.sppp(2);
-            clock.m(2);
-            clock.t(8);
+            clock.m(3);
+            clock.t(12);
         }else{
             clock.m(1);
             clock.t(4);
@@ -3262,7 +3268,6 @@ public class Opcodes {
         }
     });
     
-    //http://pastraiser.com/cpu/gameboy/gameboy_opcodes.html
     Op DJNZn = new Op(0x10, "DJNZn", map, () -> { //TODO this looks to be a STOP operation
         int i = mmu.rb(reg.pc());
         if(i > 127)
@@ -4204,7 +4209,8 @@ public class Opcodes {
     
     //PAGE 108
     
-    private void testBitmask(int v, int mask){
+    public void testBit(int v, int bit){
+        int mask = 1 << bit;
         boolean set = (v & mask) != 0;
         //Set is bit 'b' or register 'r' is 0
         reg.zero(!set);
@@ -4214,7 +4220,7 @@ public class Opcodes {
     
     //Check if bit 0 of register A is set
     Op BIT0_A = new Op(0x47, "BIT 0,A", cbmap, () -> {
-        testBitmask(reg.a(), 0b1);
+        testBit(reg.a(), 0);
         
         clock.m(2);
         clock.t(8);
@@ -4222,7 +4228,7 @@ public class Opcodes {
     
     //Check if bit 0 of register B is set
     Op BIT0_B = new Op(0x40, "BIT 0,B", cbmap, () -> {
-        testBitmask(reg.b(), 0b1);
+        testBit(reg.b(), 0);
         
         clock.m(2);
         clock.t(8);
@@ -4230,7 +4236,7 @@ public class Opcodes {
     
     //Check if bit 0 of register C is set
     Op BIT0_C = new Op(0x41, "BIT 0,C", cbmap, () -> {
-        testBitmask(reg.c(), 0b1);
+        testBit(reg.c(), 0);
         
         clock.m(2);
         clock.t(8);
@@ -4238,7 +4244,7 @@ public class Opcodes {
     
     //Check if bit 0 of register D is set
     Op BIT0_D = new Op(0x42, "BIT 0,D", cbmap, () -> {
-        testBitmask(reg.d(), 0b1);
+        testBit(reg.d(), 0);
         
         clock.m(2);
         clock.t(8);
@@ -4246,7 +4252,7 @@ public class Opcodes {
     
     //Check if bit 0 of register E is set
     Op BIT0_E = new Op(0x43, "BIT 0,E", cbmap, () -> {
-        testBitmask(reg.e(), 0b1);
+        testBit(reg.e(), 0);
         
         clock.m(2);
         clock.t(8);
@@ -4254,7 +4260,7 @@ public class Opcodes {
     
     //Check if bit 0 of register H is set
     Op BIT0_H = new Op(0x44, "BIT 0,H", cbmap, () -> {
-        testBitmask(reg.h(), 0b1);
+        testBit(reg.h(), 0);
         
         clock.m(2);
         clock.t(8);
@@ -4262,7 +4268,7 @@ public class Opcodes {
     
     //Check if bit 0 of register L is set
     Op BIT0_L = new Op(0x45, "BIT 0,L", cbmap, () -> {
-        testBitmask(reg.l(), 0b1);
+        testBit(reg.l(), 0);
         
         clock.m(2);
         clock.t(8);
@@ -4270,7 +4276,7 @@ public class Opcodes {
     
     //Check if bit 0 of memory HL is set
     Op BIT0_HL = new Op(0x46, "BIT 0,(HL)", cbmap, () -> {
-        testBitmask(mmu.rb(reg.hl()), 0b1);
+        testBit(mmu.rb(reg.hl()), 0);
         
         clock.m(4);
         clock.t(16);
@@ -4278,7 +4284,7 @@ public class Opcodes {
     
     //Check if bit 1 of register A is set
     Op BIT1_A = new Op(0x4F, "BIT 1,A", cbmap, () -> {
-        testBitmask(reg.a(), 0b10);
+        testBit(reg.a(), 1);
         
         clock.m(2);
         clock.t(8);
@@ -4286,7 +4292,7 @@ public class Opcodes {
     
     //Check if bit 1 of register B is set
     Op BIT1_B = new Op(0x48, "BIT 1,B", cbmap, () -> {
-        testBitmask(reg.b(), 0b10);
+        testBit(reg.b(), 1);
         
         clock.m(2);
         clock.t(8);
@@ -4294,7 +4300,7 @@ public class Opcodes {
     
     //Check if bit 1 of register C is set
     Op BIT1_C = new Op(0x49, "BIT 1,C", cbmap, () -> {
-        testBitmask(reg.c(), 0b10);
+        testBit(reg.c(), 1);
         
         clock.m(2);
         clock.t(8);
@@ -4302,7 +4308,7 @@ public class Opcodes {
     
     //Check if bit 1 of register D is set
     Op BIT1_D = new Op(0x4A, "BIT 1,D", cbmap, () -> {
-        testBitmask(reg.d(), 0b10);
+        testBit(reg.d(), 1);
         
         clock.m(2);
         clock.t(8);
@@ -4310,7 +4316,7 @@ public class Opcodes {
     
     //Check if bit 1 of register E is set
     Op BIT1_E = new Op(0x4B, "BIT 1,E", cbmap, () -> {
-        testBitmask(reg.e(), 0b10);
+        testBit(reg.e(), 1);
         
         clock.m(2);
         clock.t(8);
@@ -4318,7 +4324,7 @@ public class Opcodes {
     
     //Check if bit 1 of register H is set
     Op BIT1_H = new Op(0x4C, "BIT 1,H", cbmap, () -> {
-        testBitmask(reg.h(), 0b10);
+        testBit(reg.h(), 1);
         
         clock.m(2);
         clock.t(8);
@@ -4326,7 +4332,7 @@ public class Opcodes {
     
     //Check if bit 1 of register L is set
     Op BIT1_L = new Op(0x4D, "BIT 1,L", cbmap, () -> {
-        testBitmask(reg.l(), 0b10);
+        testBit(reg.l(), 1);
         
         clock.m(2);
         clock.t(8);
@@ -4334,7 +4340,7 @@ public class Opcodes {
     
     //Check if bit 1 of memory HL is set
     Op BIT1_HL = new Op(0x4E, "BIT 1,(HL)", cbmap, () -> {
-        testBitmask(mmu.rb(reg.hl()), 0b10);
+        testBit(mmu.rb(reg.hl()), 1);
         
         clock.m(4);
         clock.t(16);
@@ -4342,7 +4348,7 @@ public class Opcodes {
     
     //Check if bit 2 of register A is set
     Op BIT2_A = new Op(0x57, "BIT 2,A", cbmap, () -> {
-        testBitmask(reg.a(), 0b100);
+        testBit(reg.a(), 2);
         
         clock.m(2);
         clock.t(8);
@@ -4350,7 +4356,7 @@ public class Opcodes {
     
     //Check if bit 2 of register B is set
     Op BIT2_B = new Op(0x50, "BIT 2,B", cbmap, () -> {
-        testBitmask(reg.b(), 0b100);
+        testBit(reg.b(), 2);
         
         clock.m(2);
         clock.t(8);
@@ -4358,7 +4364,7 @@ public class Opcodes {
     
     //Check if bit 2 of register C is set
     Op BIT2_C = new Op(0x51, "BIT 2,C", cbmap, () -> {
-        testBitmask(reg.c(), 0b100);
+        testBit(reg.c(), 2);
         
         clock.m(2);
         clock.t(8);
@@ -4366,7 +4372,7 @@ public class Opcodes {
     
     //Check if bit 2 of register D is set
     Op BIT2_D = new Op(0x52, "BIT 2,D", cbmap, () -> {
-        testBitmask(reg.d(), 0b100);
+        testBit(reg.d(), 2);
         
         clock.m(2);
         clock.t(8);
@@ -4374,7 +4380,7 @@ public class Opcodes {
     
     //Check if bit 2 of register E is set
     Op BIT2_E = new Op(0x53, "BIT 2,E", cbmap, () -> {
-        testBitmask(reg.e(), 0b100);
+        testBit(reg.e(), 2);
         
         clock.m(2);
         clock.t(8);
@@ -4382,7 +4388,7 @@ public class Opcodes {
     
     //Check if bit 2 of register H is set
     Op BIT2_H = new Op(0x54, "BIT 2,H", cbmap, () -> {
-        testBitmask(reg.h(), 0b100);
+        testBit(reg.h(), 2);
         
         clock.m(2);
         clock.t(8);
@@ -4390,7 +4396,7 @@ public class Opcodes {
     
     //Check if bit 2 of register L is set
     Op BIT2_L = new Op(0x55, "BIT 2,L", cbmap, () -> {
-        testBitmask(reg.l(), 0b100);
+        testBit(reg.l(), 2);
         
         clock.m(2);
         clock.t(8);
@@ -4398,7 +4404,7 @@ public class Opcodes {
     
     //Check if bit 2 of memory HL is set
     Op BIT2_HL = new Op(0x56, "BIT 2,(HL)", cbmap, () -> {
-        testBitmask(mmu.rb(reg.hl()), 0b100);
+        testBit(mmu.rb(reg.hl()), 2);
         
         clock.m(4);
         clock.t(16);
@@ -4406,7 +4412,7 @@ public class Opcodes {
     
     //Check if bit 3 of register A is set
     Op BIT3_A = new Op(0x5F, "BIT 3,A", cbmap, () -> {
-        testBitmask(reg.a(), 0b1000);
+        testBit(reg.a(), 3);
         
         clock.m(2);
         clock.t(8);
@@ -4414,7 +4420,7 @@ public class Opcodes {
     
     //Check if bit 3 of register B is set
     Op BIT3_B = new Op(0x58, "BIT 3,B", cbmap, () -> {
-        testBitmask(reg.b(), 0b1000);
+        testBit(reg.b(), 3);
         
         clock.m(2);
         clock.t(8);
@@ -4422,7 +4428,7 @@ public class Opcodes {
     
     //Check if bit 3 of register C is set
     Op BIT3_C = new Op(0x59, "BIT 3,C", cbmap, () -> {
-        testBitmask(reg.c(), 0b1000);
+        testBit(reg.c(), 3);
         
         clock.m(2);
         clock.t(8);
@@ -4430,7 +4436,7 @@ public class Opcodes {
     
     //Check if bit 3 of register D is set
     Op BIT3_D = new Op(0x5A, "BIT 3,D", cbmap, () -> {
-        testBitmask(reg.d(), 0b1000);
+        testBit(reg.d(), 3);
         
         clock.m(2);
         clock.t(8);
@@ -4438,7 +4444,7 @@ public class Opcodes {
     
     //Check if bit 3 of register E is set
     Op BIT3_E = new Op(0x5B, "BIT 3,E", cbmap, () -> {
-        testBitmask(reg.e(), 0b1000);
+        testBit(reg.e(), 3);
         
         clock.m(2);
         clock.t(8);
@@ -4446,7 +4452,7 @@ public class Opcodes {
     
     //Check if bit 3 of register H is set
     Op BIT3_H = new Op(0x5C, "BIT 3,H", cbmap, () -> {
-        testBitmask(reg.h(), 0b1000);
+        testBit(reg.h(), 3);
         
         clock.m(2);
         clock.t(8);
@@ -4454,7 +4460,7 @@ public class Opcodes {
     
     //Check if bit 3 of register L is set
     Op BIT3_L = new Op(0x5D, "BIT 3,L", cbmap, () -> {
-        testBitmask(reg.l(), 0b1000);
+        testBit(reg.l(), 3);
         
         clock.m(2);
         clock.t(8);
@@ -4462,7 +4468,7 @@ public class Opcodes {
     
     //Check if bit 3 of memory HL is set
     Op BIT3_HL = new Op(0x5E, "BIT 3,(HL)", cbmap, () -> {
-        testBitmask(mmu.rb(reg.hl()), 0b1000);
+        testBit(mmu.rb(reg.hl()), 3);
         
         clock.m(4);
         clock.t(16);
@@ -4470,7 +4476,7 @@ public class Opcodes {
     
     //Check if bit 4 of register A is set
     Op BIT4_A = new Op(0x67, "BIT 4,A", cbmap, () -> {
-        testBitmask(reg.a(), 0b10000);
+        testBit(reg.a(), 4);
         
         clock.m(2);
         clock.t(8);
@@ -4478,7 +4484,7 @@ public class Opcodes {
     
     //Check if bit 4 of register B is set
     Op BIT4_B = new Op(0x60, "BIT 4,B", cbmap, () -> {
-        testBitmask(reg.b(), 0b10000);
+        testBit(reg.b(), 4);
         
         clock.m(2);
         clock.t(8);
@@ -4486,7 +4492,7 @@ public class Opcodes {
     
     //Check if bit 4 of register C is set
     Op BIT4_C = new Op(0x61, "BIT 4,C", cbmap, () -> {
-        testBitmask(reg.c(), 0b10000);
+        testBit(reg.c(), 4);
         
         clock.m(2);
         clock.t(8);
@@ -4494,7 +4500,7 @@ public class Opcodes {
     
     //Check if bit 4 of register D is set
     Op BIT4_D = new Op(0x62, "BIT 4,D", cbmap, () -> {
-        testBitmask(reg.d(), 0b10000);
+        testBit(reg.d(), 4);
         
         clock.m(2);
         clock.t(8);
@@ -4502,7 +4508,7 @@ public class Opcodes {
     
     //Check if bit 4 of register E is set
     Op BIT4_E = new Op(0x63, "BIT 4,E", cbmap, () -> {
-        testBitmask(reg.e(), 0b10000);
+        testBit(reg.e(), 4);
         
         clock.m(2);
         clock.t(8);
@@ -4510,7 +4516,7 @@ public class Opcodes {
     
     //Check if bit 4 of register H is set
     Op BIT4_H = new Op(0x64, "BIT 4,H", cbmap, () -> {
-        testBitmask(reg.h(), 0b10000);
+        testBit(reg.h(), 4);
         
         clock.m(2);
         clock.t(8);
@@ -4518,7 +4524,7 @@ public class Opcodes {
     
     //Check if bit 4 of register L is set
     Op BIT4_L = new Op(0x65, "BIT 4,L", cbmap, () -> {
-        testBitmask(reg.l(), 0b10000);
+        testBit(reg.l(), 4);
         
         clock.m(2);
         clock.t(8);
@@ -4526,7 +4532,7 @@ public class Opcodes {
     
     //Check if bit 4 of memory HL is set
     Op BIT4_HL = new Op(0x66, "BIT 4,(HL)", cbmap, () -> {
-        testBitmask(mmu.rb(reg.hl()), 0b10000);
+        testBit(mmu.rb(reg.hl()), 4);
 
         clock.m(4);
         clock.t(16);
@@ -4534,7 +4540,7 @@ public class Opcodes {
     
     //Check if bit 5 of register A is set
     Op BIT5_A = new Op(0x6F, "BIT 5,A", cbmap, () -> {
-        testBitmask(reg.a(), 0b100000);
+        testBit(reg.a(), 5);
         
         clock.m(2);
         clock.t(8);
@@ -4542,7 +4548,7 @@ public class Opcodes {
     
     //Check if bit 5 of register B is set
     Op BIT5_B = new Op(0x68, "BIT 5,B", cbmap, () -> {
-        testBitmask(reg.b(), 0b100000);
+        testBit(reg.b(), 5);
         
         clock.m(2);
         clock.t(8);
@@ -4550,7 +4556,7 @@ public class Opcodes {
     
     //Check if bit 5 of register C is set
     Op BIT5_C = new Op(0x69, "BIT 5,C", cbmap, () -> {
-        testBitmask(reg.c(), 0b100000);
+        testBit(reg.c(), 5);
         
         clock.m(2);
         clock.t(8);
@@ -4558,7 +4564,7 @@ public class Opcodes {
     
     //Check if bit 5 of register D is set
     Op BIT5_D = new Op(0x6A, "BIT 5,D", cbmap, () -> {
-        testBitmask(reg.d(), 0b100000);
+        testBit(reg.d(), 5);
         
         clock.m(2);
         clock.t(8);
@@ -4566,7 +4572,7 @@ public class Opcodes {
     
     //Check if bit 5 of register E is set
     Op BIT5_E = new Op(0x6B, "BIT 5,E", cbmap, () -> {
-        testBitmask(reg.e(), 0b100000);
+        testBit(reg.e(), 5);
         
         clock.m(2);
         clock.t(8);
@@ -4574,7 +4580,7 @@ public class Opcodes {
     
     //Check if bit 5 of register H is set
     Op BIT5_H = new Op(0x6C, "BIT 5,H", cbmap, () -> {
-        testBitmask(reg.h(), 0b100000);
+        testBit(reg.h(), 5);
         
         clock.m(2);
         clock.t(8);
@@ -4582,7 +4588,7 @@ public class Opcodes {
     
     //Check if bit 5 of register L is set
     Op BIT5_L = new Op(0x6D, "BIT 5,L", cbmap, () -> {
-        testBitmask(reg.l(), 0b100000);
+        testBit(reg.l(), 5);
         
         clock.m(2);
         clock.t(8);
@@ -4590,7 +4596,7 @@ public class Opcodes {
     
     //Check if bit 5 of memory HL is set
     Op BIT5_HL = new Op(0x6E, "BIT 5,(HL)", cbmap, () -> {
-        testBitmask(mmu.rb(reg.hl()), 0b100000);
+        testBit(mmu.rb(reg.hl()), 5);
         
         clock.m(4);
         clock.t(16);
@@ -4598,7 +4604,7 @@ public class Opcodes {
     
     //Check if bit 6 of register A is set
     Op BIT6_A = new Op(0x77, "BIT 6,A", cbmap, () -> {
-        testBitmask(reg.a(), 0b1000000);
+        testBit(reg.a(), 6);
         
         clock.m(2);
         clock.t(8);
@@ -4606,7 +4612,7 @@ public class Opcodes {
     
     //Check if bit 6 of register B is set
     Op BIT6_B = new Op(0x70, "BIT 6,B", cbmap, () -> {
-        testBitmask(reg.b(), 0b1000000);
+        testBit(reg.b(), 6);
         
         clock.m(2);
         clock.t(8);
@@ -4614,7 +4620,7 @@ public class Opcodes {
     
     //Check if bit 6 of register C is set
     Op BIT6_C = new Op(0x71, "BIT 6,C", cbmap, () -> {
-        testBitmask(reg.c(), 0b1000000);
+        testBit(reg.c(), 6);
         
         clock.m(2);
         clock.t(8);
@@ -4622,7 +4628,7 @@ public class Opcodes {
     
     //Check if bit 6 of register D is set
     Op BIT6_D = new Op(0x72, "BIT 6,D", cbmap, () -> {
-        testBitmask(reg.d(), 0b1000000);
+        testBit(reg.d(), 6);
         
         clock.m(2);
         clock.t(8);
@@ -4630,7 +4636,7 @@ public class Opcodes {
     
     //Check if bit 6 of register E is set
     Op BIT6_E = new Op(0x73, "BIT 6,E", cbmap, () -> {
-        testBitmask(reg.e(), 0b1000000);
+        testBit(reg.e(), 6);
         
         clock.m(2);
         clock.t(8);
@@ -4638,7 +4644,7 @@ public class Opcodes {
     
     //Check if bit 6 of register H is set
     Op BIT6_H = new Op(0x74, "BIT 6,H", cbmap, () -> {
-        testBitmask(reg.h(), 0b1000000);
+        testBit(reg.h(), 6);
         
         clock.m(2);
         clock.t(8);
@@ -4646,7 +4652,7 @@ public class Opcodes {
     
     //Check if bit 6 of register L is set
     Op BIT6_L = new Op(0x75, "BIT 6,L", cbmap, () -> {
-        testBitmask(reg.l(), 0b1000000);
+        testBit(reg.l(), 6);
         
         clock.m(2);
         clock.t(8);
@@ -4654,7 +4660,7 @@ public class Opcodes {
     
     //Check if bit 6 of memory HL is set
     Op BIT6_HL = new Op(0x76, "BIT 6,(HL)", cbmap, () -> {
-        testBitmask(mmu.rb(reg.hl()), 0b1000000);
+        testBit(mmu.rb(reg.hl()), 6);
 
         clock.m(4);
         clock.t(16);
@@ -4662,7 +4668,7 @@ public class Opcodes {
     
     //Check if bit 7 of register A is set
     Op BIT7_A = new Op(0x7F, "BIT 7,A", cbmap, () -> {
-        testBitmask(reg.a(), 0b10000000);
+        testBit(reg.a(), 7);
         
         clock.m(2);
         clock.t(8);
@@ -4670,7 +4676,7 @@ public class Opcodes {
     
     //Check if bit 7 of register B is set
     Op BIT7_B = new Op(0x78, "BIT 7,B", cbmap, () -> {
-        testBitmask(reg.b(), 0b10000000);
+        testBit(reg.b(), 7);
         
         clock.m(2);
         clock.t(8);
@@ -4678,7 +4684,7 @@ public class Opcodes {
     
     //Check if bit 7 of register C is set
     Op BIT7_C = new Op(0x79, "BIT 7,C", cbmap, () -> {
-        testBitmask(reg.c(), 0b10000000);
+        testBit(reg.c(), 7);
         
         clock.m(2);
         clock.t(8);
@@ -4686,7 +4692,7 @@ public class Opcodes {
     
     //Check if bit 7 of register D is set
     Op BIT7_D = new Op(0x7A, "BIT 7,D", cbmap, () -> {
-        testBitmask(reg.d(), 0b10000000);
+        testBit(reg.d(), 7);
         
         clock.m(2);
         clock.t(8);
@@ -4694,7 +4700,7 @@ public class Opcodes {
     
     //Check if bit 7 of register E is set
     Op BIT7_E = new Op(0x7B, "BIT 7,E", cbmap, () -> {
-        testBitmask(reg.e(), 0b10000000);
+        testBit(reg.e(), 7);
         
         clock.m(2);
         clock.t(8);
@@ -4702,7 +4708,7 @@ public class Opcodes {
     
     //Check if bit 7 of register H is set
     Op BIT7_H = new Op(0x7C, "BIT 7,H", cbmap, () -> {
-        testBitmask(reg.h(), 0b10000000);
+        testBit(reg.h(), 7);
         
         clock.m(2);
         clock.t(8);
@@ -4710,7 +4716,7 @@ public class Opcodes {
     
     //Check if bit 7 of register L is set
     Op BIT7_L = new Op(0x7D, "BIT 7,L", cbmap, () -> {
-        testBitmask(reg.l(), 0b10000000);
+        testBit(reg.l(), 7);
         
         clock.m(2);
         clock.t(8);
@@ -4718,16 +4724,20 @@ public class Opcodes {
     
     //Check if bit 7 of memory HL is set
     Op BIT7_HL = new Op(0x7E, "BIT 7,(HL)", cbmap, () -> {
-        testBitmask(mmu.rb(reg.hl()), 0b10000000);
+        testBit(mmu.rb(reg.hl()), 7);
         
         clock.m(4);
         clock.t(16);
     });
     
+    public int setBit(int i, int bit){
+        int mask = 1 << bit;
+        return i | mask;
+    }
+    
     //Set bit b in register r
     Op SET0_A = new Op(0xC7, "SET 0,A", cbmap, () -> {
-        int bitmask = 0b1;
-        reg.a( reg.a() | bitmask);
+        reg.a(setBit(reg.a(), 0));
         
         clock.m(2);
         clock.t(8);
@@ -4735,8 +4745,7 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET0_B = new Op(0xC0, "SET 0,B", cbmap, () -> {
-        int bitmask = 0b1;
-        reg.b( reg.b() | bitmask);
+        reg.b(setBit(reg.b(), 0));
         
         clock.m(2);
         clock.t(8);
@@ -4744,8 +4753,7 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET0_C = new Op(0xC1, "SET 0,C", cbmap, () -> {
-        int bitmask = 0b1;
-        reg.c( reg.c() | bitmask);
+        reg.c(setBit(reg.c(), 0));
         
         clock.m(2);
         clock.t(8);
@@ -4753,8 +4761,7 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET0_D = new Op(0xC2, "SET 0,D", cbmap, () -> {
-        int bitmask = 0b1;
-        reg.d( reg.d() | bitmask);
+        reg.d(setBit(reg.d(), 0));
         
         clock.m(2);
         clock.t(8);
@@ -4762,8 +4769,7 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET0_E = new Op(0xC3, "SET 0,E", cbmap, () -> {
-        int bitmask = 0b1;
-        reg.e( reg.e() | bitmask);
+        reg.e(setBit(reg.e(), 0));
         
         clock.m(2);
         clock.t(8);
@@ -4771,8 +4777,7 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET0_H = new Op(0xC4, "SET 0,H", cbmap, () -> {
-        int bitmask = 0b1;
-        reg.h( reg.h() | bitmask);
+        reg.h(setBit(reg.h(), 0));
         
         clock.m(2);
         clock.t(8);
@@ -4780,8 +4785,7 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET0_L = new Op(0xC5, "SET 0,L", cbmap, () -> {
-        int bitmask = 0b1;
-        reg.l( reg.l() | bitmask);
+        reg.l(setBit(reg.l(), 0));
         
         clock.m(2);
         clock.t(8);
@@ -4789,8 +4793,7 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET0_HL = new Op(0xC6, "SET 0,(HL)", cbmap, () -> {
-        int bitmask = 0b1;
-        mmu.wb( reg.hl(), mmu.rb(reg.hl()) | bitmask);
+        mmu.wb( reg.hl(), setBit(mmu.rb(reg.hl()), 0));
         
         clock.m(4);
         clock.t(16);
@@ -4798,8 +4801,7 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET1_A = new Op(0xCF, "SET 1,A", cbmap, () -> {
-        int bitmask = 0b10;
-        reg.a( reg.a() | bitmask);
+        reg.a(setBit(reg.a(), 1));
         
         clock.m(2);
         clock.t(8);
@@ -4807,8 +4809,7 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET1_B = new Op(0xC8, "SET 1,B", cbmap, () -> {
-        int bitmask = 0b10;
-        reg.b( reg.b() | bitmask);
+        reg.b(setBit(reg.b(), 1));
         
         clock.m(2);
         clock.t(8);
@@ -4816,8 +4817,7 @@ public class Opcodes {
    
     //Set bit b in register r
     Op SET1_C = new Op(0xC9, "SET 1,C", cbmap, () -> {
-        int bitmask = 0b10;
-        reg.c( reg.c() | bitmask);
+        reg.c(setBit(reg.c(), 1));
         
         clock.m(2);
         clock.t(8);
@@ -4825,8 +4825,7 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET1_D = new Op(0xCA, "SET 1,D", cbmap, () -> {
-        int bitmask = 0b10;
-        reg.d( reg.d() | bitmask);
+        reg.d(setBit(reg.d(), 1));
         
         clock.m(2);
         clock.t(8);
@@ -4834,8 +4833,7 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET1_E = new Op(0xCB, "SET 1,E", cbmap, () -> {
-        int bitmask = 0b10;
-        reg.e( reg.e() | bitmask);
+        reg.e(setBit(reg.e(), 1));
         
         clock.m(2);
         clock.t(8);
@@ -4843,8 +4841,7 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET1_H = new Op(0xCC, "SET 1,H", cbmap, () -> {
-        int bitmask = 0b10;
-        reg.h( reg.h() | bitmask);
+        reg.h(setBit(reg.h(), 1));
         
         clock.m(2);
         clock.t(8);
@@ -4852,8 +4849,7 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET1_L = new Op(0xCD, "SET 1,L", cbmap, () -> {
-        int bitmask = 0b10;
-        reg.l( reg.l() | bitmask);
+        reg.l(setBit(reg.l(), 1));
         
         clock.m(2);
         clock.t(8);
@@ -4861,8 +4857,7 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET1_HL = new Op(0xCE, "SET 1,(HL)", cbmap, () -> {
-        int bitmask = 0b10;
-        mmu.wb( reg.hl(), mmu.rb(reg.hl()) | bitmask);
+        mmu.wb( reg.hl(), setBit(mmu.rb(reg.hl()), 1));
         
         clock.m(4);
         clock.t(16);
@@ -4870,8 +4865,7 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET2_A = new Op(0xD7, "SET 2,A", cbmap, () -> {
-        int bitmask = 0b100;
-        reg.a( reg.a() | bitmask);
+        reg.a(setBit(reg.a(), 2));
         
         clock.m(2);
         clock.t(8);
@@ -4879,8 +4873,7 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET2_B = new Op(0xD0, "SET 2,B", cbmap, () -> {
-        int bitmask = 0b100;
-        reg.b( reg.b() | bitmask);
+        reg.b(setBit(reg.b(), 2));
         
         clock.m(2);
         clock.t(8);
@@ -4888,8 +4881,7 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET2_C = new Op(0xD1, "SET 2,C", cbmap, () -> {
-        int bitmask = 0b100;
-        reg.c( reg.c() | bitmask);
+        reg.c(setBit(reg.c(), 2));
         
         clock.m(2);
         clock.t(8);
@@ -4897,8 +4889,7 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET2_D = new Op(0xD2, "SET 2,D", cbmap, () -> {
-        int bitmask = 0b100;
-        reg.d( reg.d() | bitmask);
+        reg.d(setBit(reg.d(), 2));
         
         clock.m(2);
         clock.t(8);
@@ -4906,8 +4897,7 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET2_E = new Op(0xD3, "SET 2,E", cbmap, () -> {
-        int bitmask = 0b100;
-        reg.e( reg.e() | bitmask);
+        reg.e(setBit(reg.e(), 2));
         
         clock.m(2);
         clock.t(8);
@@ -4915,8 +4905,7 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET2_H = new Op(0xD4, "SET 2,H", cbmap, () -> {
-        int bitmask = 0b100;
-        reg.h( reg.h() | bitmask);
+        reg.h(setBit(reg.h(), 2));
         
         clock.m(2);
         clock.t(8);
@@ -4924,8 +4913,7 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET2_L = new Op(0xD5, "SET 2,L", cbmap, () -> {
-        int bitmask = 0b100;
-        reg.l( reg.l() | bitmask);
+        reg.l(setBit(reg.l(), 2));
         
         clock.m(2);
         clock.t(8);
@@ -4933,8 +4921,7 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET2_HL = new Op(0xD6, "SET 2,(HL)", cbmap, () -> {
-        int bitmask = 0b100;
-        mmu.wb( reg.hl(), mmu.rb(reg.hl()) | bitmask);
+        mmu.wb( reg.hl(), setBit(mmu.rb(reg.hl()), 2));
         
         clock.m(4);
         clock.t(16);
@@ -4942,8 +4929,7 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET3_A = new Op(0xDF, "SET 3,A", cbmap, () -> {
-        int bitmask = 0b1000;
-        reg.a( reg.a() | bitmask);
+        reg.a( setBit(reg.a(), 3));
         
         clock.m(2);
         clock.t(8);
@@ -4951,8 +4937,7 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET3_B = new Op(0xD8, "SET 3,B", cbmap, () -> {
-        int bitmask = 0b1000;
-        reg.b( reg.b() | bitmask);
+        reg.b(setBit(reg.b(), 3));
         
         clock.m(2);
         clock.t(8);
@@ -4960,8 +4945,7 @@ public class Opcodes {
    
     //Set bit b in register r
     Op SET3_C = new Op(0xD9, "SET 3,C", cbmap, () -> {
-        int bitmask = 0b1000;
-        reg.c( reg.c() | bitmask);
+        reg.c(setBit(reg.c(), 3));
         
         clock.m(2);
         clock.t(8);
@@ -4969,8 +4953,7 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET3_D = new Op(0xDA, "SET 3,D", cbmap, () -> {
-        int bitmask = 0b1000;
-        reg.d( reg.d() | bitmask);
+        reg.d( setBit(reg.d(), 3));
         
         clock.m(2);
         clock.t(8);
@@ -4978,8 +4961,7 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET3_E = new Op(0xDB, "SET 3,E", cbmap, () -> {
-        int bitmask = 0b1000;
-        reg.e( reg.e() | bitmask);
+        reg.e(setBit(reg.e(), 3));
         
         clock.m(2);
         clock.t(8);
@@ -4987,8 +4969,7 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET3_H = new Op(0xDC, "SET 3,H", cbmap, () -> {
-        int bitmask = 0b1000;
-        reg.h( reg.h() | bitmask);
+        reg.h(setBit(reg.h(), 3));
         
         clock.m(2);
         clock.t(8);
@@ -4996,8 +4977,7 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET3_L = new Op(0xDD, "SET 3,L", cbmap, () -> {
-        int bitmask = 0b1000;
-        reg.l( reg.l() | bitmask);
+        reg.l(setBit(reg.l(), 3));
         
         clock.m(2);
         clock.t(8);
@@ -5005,8 +4985,7 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET3_HL = new Op(0xDE, "SET 3,(HL)", cbmap, () -> {
-        int bitmask = 0b1000;
-        mmu.wb( reg.hl(), mmu.rb(reg.hl()) | bitmask);
+        mmu.wb( reg.hl(), setBit(mmu.rb(reg.hl()), 3));
         
         clock.m(4);
         clock.t(16);
@@ -5014,8 +4993,7 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET4_A = new Op(0xE7, "SET 4,A", cbmap, () -> {
-        int bitmask = 0b10000;
-        reg.a( reg.a() | bitmask);
+        reg.a(setBit(reg.a(), 4));
         
         clock.m(2);
         clock.t(8);
@@ -5023,8 +5001,7 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET4_B = new Op(0xE0, "SET 4,B", cbmap, () -> {
-        int bitmask = 0b10000;
-        reg.b( reg.b() | bitmask);
+        reg.b(setBit(reg.b(), 4));
         
         clock.m(2);
         clock.t(8);
@@ -5032,8 +5009,7 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET4_C = new Op(0xE1, "SET 4,C", cbmap, () -> {
-        int bitmask = 0b10000;
-        reg.c( reg.c() | bitmask);
+        reg.c(setBit(reg.c(), 4));
         
         clock.m(2);
         clock.t(8);
@@ -5041,8 +5017,7 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET4_D = new Op(0xE2, "SET 4,D", cbmap, () -> {
-        int bitmask = 0b10000;
-        reg.d( reg.d() | bitmask);
+        reg.d(setBit(reg.d(), 4));
         
         clock.m(2);
         clock.t(8);
@@ -5050,8 +5025,7 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET4_E = new Op(0xE3, "SET 4,E", cbmap, () -> {
-        int bitmask = 0b10000;
-        reg.e( reg.e() | bitmask);
+        reg.e(setBit(reg.e(), 4));
         
         clock.m(2);
         clock.t(8);
@@ -5059,8 +5033,7 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET4_H = new Op(0xE4, "SET 4,H", cbmap, () -> {
-        int bitmask = 0b10000;
-        reg.h( reg.h() | bitmask);
+        reg.h(setBit(reg.h(), 4));
         
         clock.m(2);
         clock.t(8);
@@ -5068,8 +5041,7 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET4_L = new Op(0xE5, "SET 4,L", cbmap, () -> {
-        int bitmask = 0b10000;
-        reg.l( reg.l() | bitmask);
+        reg.l(setBit(reg.l(), 4));
         
         clock.m(2);
         clock.t(8);
@@ -5077,8 +5049,7 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET4_HL = new Op(0xE6, "SET 4,(HL)", cbmap, () -> {
-        int bitmask = 0b10000;
-        mmu.wb( reg.hl(), mmu.rb(reg.hl()) | bitmask);
+        mmu.wb( reg.hl(), setBit(mmu.rb(reg.hl()), 4));
         
         clock.m(4);
         clock.t(16);
@@ -5086,8 +5057,7 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET5_A = new Op(0xEF, "SET 5,A", cbmap, () -> {
-        int bitmask = 0b100000;
-        reg.a( reg.a() | bitmask);
+        reg.a(setBit(reg.a(), 5));
         
         clock.m(2);
         clock.t(8);
@@ -5095,8 +5065,7 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET5_B = new Op(0xE8, "SET 5,B", cbmap, () -> {
-        int bitmask = 0b100000;
-        reg.b( reg.b() | bitmask);
+        reg.b( setBit(reg.b(), 5));
         
         clock.m(2);
         clock.t(8);
@@ -5104,8 +5073,7 @@ public class Opcodes {
    
     //Set bit b in register r
     Op SET5_C = new Op(0xE9, "SET 5,C", cbmap, () -> {
-        int bitmask = 0b100000;
-        reg.c( reg.c() | bitmask);
+        reg.c(setBit(reg.c(), 5));
         
         clock.m(2);
         clock.t(8);
@@ -5113,8 +5081,7 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET5_D = new Op(0xEA, "SET 5,D", cbmap, () -> {
-        int bitmask = 0b100000;
-        reg.d( reg.d() | bitmask);
+        reg.d(setBit(reg.d(), 5));
         
         clock.m(2);
         clock.t(8);
@@ -5122,8 +5089,7 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET5_E = new Op(0xEB, "SET 5,E", cbmap, () -> {
-        int bitmask = 0b100000;
-        reg.e( reg.e() | bitmask);
+        reg.e(setBit(reg.e(), 5));
         
         clock.m(2);
         clock.t(8);
@@ -5131,8 +5097,7 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET5_H = new Op(0xEC, "SET 5,H", cbmap, () -> {
-        int bitmask = 0b100000;
-        reg.h( reg.h() | bitmask);
+        reg.h( setBit(reg.h(), 5));
         
         clock.m(2);
         clock.t(8);
@@ -5140,8 +5105,7 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET5_L = new Op(0xED, "SET 5,L", cbmap, () -> {
-        int bitmask = 0b100000;
-        reg.l( reg.l() | bitmask);
+        reg.l(setBit(reg.l(), 5));
         
         clock.m(2);
         clock.t(8);
@@ -5149,8 +5113,7 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET5_HL = new Op(0xEE, "SET 5,(HL)", cbmap, () -> {
-        int bitmask = 0b100000;
-        mmu.wb( reg.hl(), mmu.rb(reg.hl()) | bitmask);
+        mmu.wb( reg.hl(), setBit(mmu.rb(reg.hl()), 5));
         
         clock.m(4);
         clock.t(16);
@@ -5158,8 +5121,7 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET6_A = new Op(0xF7, "SET 6,A", cbmap, () -> {
-        int bitmask = 0b1000000;
-        reg.a( reg.a() | bitmask);
+        reg.a(setBit(reg.a(), 6));
         
         clock.m(2);
         clock.t(8);
@@ -5167,8 +5129,7 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET6_B = new Op(0xF0, "SET 6,B", cbmap, () -> {
-        int bitmask = 0b1000000;
-        reg.b( reg.b() | bitmask);
+        reg.b(setBit(reg.b(), 6));
         
         clock.m(2);
         clock.t(8);
@@ -5176,8 +5137,7 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET6_C = new Op(0xF1, "SET 6,C", cbmap, () -> {
-        int bitmask = 0b1000000;
-        reg.c( reg.c() | bitmask);
+        reg.c(setBit(reg.c(), 6));
         
         clock.m(2);
         clock.t(8);
@@ -5185,8 +5145,7 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET6_D = new Op(0xF2, "SET 6,D", cbmap, () -> {
-        int bitmask = 0b1000000;
-        reg.d( reg.d() | bitmask);
+        reg.d(setBit(reg.d(), 6));
         
         clock.m(2);
         clock.t(8);
@@ -5194,8 +5153,7 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET6_E = new Op(0xF3, "SET 6,E", cbmap, () -> {
-        int bitmask = 0b1000000;
-        reg.e( reg.e() | bitmask);
+        reg.e(setBit(reg.e(), 6));
         
         clock.m(2);
         clock.t(8);
@@ -5203,8 +5161,7 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET6_H = new Op(0xF4, "SET 6,H", cbmap, () -> {
-        int bitmask = 0b1000000;
-        reg.h( reg.h() | bitmask);
+        reg.h(setBit(reg.h(), 6));
         
         clock.m(2);
         clock.t(8);
@@ -5212,8 +5169,7 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET6_L = new Op(0xF5, "SET 6,L", cbmap, () -> {
-        int bitmask = 0b1000000;
-        reg.l( reg.l() | bitmask);
+        reg.l(setBit(reg.l(), 6));
         
         clock.m(2);
         clock.t(8);
@@ -5221,8 +5177,7 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET6_HL = new Op(0xF6, "SET 6,(HL)", cbmap, () -> {
-        int bitmask = 0b1000000;
-        mmu.wb( reg.hl(), mmu.rb(reg.hl()) | bitmask);
+        mmu.wb( reg.hl(), setBit(mmu.rb(reg.hl()), 6));
         
         clock.m(4);
         clock.t(16);
@@ -5230,8 +5185,7 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET7_A = new Op(0xFF, "SET 7,A", cbmap, () -> {
-        int bitmask = 0b10000000;
-        reg.a( reg.a() | bitmask);
+        reg.a(setBit(reg.a(), 7));
         
         clock.m(2);
         clock.t(8);
@@ -5239,8 +5193,7 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET7_B = new Op(0xF8, "SET 7,B", cbmap, () -> {
-        int bitmask = 0b10000000;
-        reg.b( reg.b() | bitmask);
+        reg.b(setBit(reg.b(), 7));
         
         clock.m(2);
         clock.t(8);
@@ -5248,8 +5201,7 @@ public class Opcodes {
    
     //Set bit b in register r
     Op SET7_C = new Op(0xF9, "SET 7,C", cbmap, () -> {
-        int bitmask = 0b10000000;
-        reg.c( reg.c() | bitmask);
+        reg.c(setBit(reg.c(), 7));
         
         clock.m(2);
         clock.t(8);
@@ -5257,8 +5209,7 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET7_D = new Op(0xFA, "SET 7,D", cbmap, () -> {
-        int bitmask = 0b10000000;
-        reg.d( reg.d() | bitmask);
+        reg.d(setBit(reg.d(), 7));
         
         clock.m(2);
         clock.t(8);
@@ -5266,8 +5217,7 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET7_E = new Op(0xFB, "SET 7,E", cbmap, () -> {
-        int bitmask = 0b10000000;
-        reg.e( reg.e() | bitmask);
+        reg.e(setBit(reg.e(), 7));
         
         clock.m(2);
         clock.t(8);
@@ -5275,8 +5225,7 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET7_H = new Op(0xFC, "SET 7,H", cbmap, () -> {
-        int bitmask = 0b10000000;
-        reg.h( reg.h() | bitmask);
+        reg.h(setBit(reg.h(), 7));
         
         clock.m(2);
         clock.t(8);
@@ -5284,8 +5233,7 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET7_L = new Op(0xFD, "SET 7,L", cbmap, () -> {
-        int bitmask = 0b10000000;
-        reg.l( reg.l() | bitmask);
+        reg.l( setBit(reg.l(), 7));
         
         clock.m(2);
         clock.t(8);
@@ -5293,20 +5241,21 @@ public class Opcodes {
     
     //Set bit b in register r
     Op SET7_HL = new Op(0xFE, "SET 7,(HL)", cbmap, () -> {
-        int bitmask = 0b10000000;
-        mmu.wb( reg.hl(), mmu.rb(reg.hl()) | bitmask);
+        mmu.wb( reg.hl(), setBit(mmu.rb(reg.hl()), 7));
         
         clock.m(4);
         clock.t(16);
     });
     
+    public int resetBit(int i, int bit){
+        int mask = ~(1 << bit);
+        return i & mask;
+    }
+    
     //Reset the bit b in register r
     Op RES0_A = new Op(0x87, "RES 0,A", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b1;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        reg.a( reg.a() & invertedBitmask );
+        reg.a(resetBit(reg.a(), 0));
         
         clock.m(2);
         clock.t(8);
@@ -5314,11 +5263,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES0_B = new Op(0x80, "RES 0,B", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b1;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        reg.b( reg.b() & invertedBitmask );
+        reg.b(resetBit(reg.b(), 0));
         
         clock.m(2);
         clock.t(8);
@@ -5326,11 +5272,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES0_C = new Op(0x81, "RES 0,C", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b1;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        reg.c( reg.c() & invertedBitmask );
+        reg.c(resetBit(reg.c(), 0));
         
         clock.m(2);
         clock.t(8);
@@ -5338,11 +5281,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES0_D = new Op(0x82, "RES 0,D", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b1;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        reg.d( reg.d() & invertedBitmask );
+        reg.d(resetBit(reg.d(), 0));
         
         clock.m(2);
         clock.t(8);
@@ -5350,11 +5290,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES0_E = new Op(0x83, "RES 0,E", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b1;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        reg.e( reg.e() & invertedBitmask );
+        reg.e(resetBit(reg.e(), 0));
         
         clock.m(2);
         clock.t(8);
@@ -5362,11 +5299,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES0_H = new Op(0x84, "RES 0,H", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b1;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        reg.h( reg.h() & invertedBitmask );
+        reg.h(resetBit(reg.h(), 0));
         
         clock.m(2);
         clock.t(8);
@@ -5374,11 +5308,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES0_L = new Op(0x85, "RES 0,L", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b1;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        reg.l( reg.l() & invertedBitmask );
+        reg.l(resetBit(reg.l(), 0));
         
         clock.m(2);
         clock.t(8);
@@ -5386,11 +5317,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES0_HL = new Op(0x86, "RES 0,(HL)", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b1;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        mmu.wb( reg.hl(), mmu.rb(reg.hl()) & invertedBitmask );
+        mmu.wb( reg.hl(), resetBit(mmu.rb(reg.hl()), 0) );
         
         clock.m(4);
         clock.t(16);
@@ -5398,11 +5326,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES1_A = new Op(0x8F, "RES 1,A", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b10;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        reg.a( reg.a() & invertedBitmask );
+        reg.a( resetBit(reg.a(), 1));
         
         clock.m(2);
         clock.t(8);
@@ -5410,11 +5335,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES1_B = new Op(0x88, "RES 1,B", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b10;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        reg.b( reg.b() & invertedBitmask );
+        reg.b( resetBit(reg.b(), 1));
         
         clock.m(2);
         clock.t(8);
@@ -5422,11 +5344,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES1_C = new Op(0x89, "RES 1,C", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b10;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        reg.c( reg.c() & invertedBitmask );
+        reg.c(resetBit(reg.c(), 1));
         
         clock.m(2);
         clock.t(8);
@@ -5434,11 +5353,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES1_D = new Op(0x8A, "RES 1,D", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b10;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        reg.d( reg.d() & invertedBitmask );
+        reg.d(resetBit(reg.d(), 1));
         
         clock.m(2);
         clock.t(8);
@@ -5446,11 +5362,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES1_E = new Op(0x8B, "RES 1,E", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b10;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        reg.e( reg.e() & invertedBitmask );
+        reg.e( resetBit(reg.e(), 1));
         
         clock.m(2);
         clock.t(8);
@@ -5458,11 +5371,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES1_H = new Op(0x8C, "RES 1,H", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b10;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        reg.h( reg.h() & invertedBitmask );
+        reg.h(resetBit(reg.h(), 1));
         
         clock.m(2);
         clock.t(8);
@@ -5470,11 +5380,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES1_L = new Op(0x8D, "RES 1,L", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b10;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        reg.l( reg.l() & invertedBitmask );
+        reg.l(resetBit(reg.l(), 1));
         
         clock.m(2);
         clock.t(8);
@@ -5482,11 +5389,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES1_HL = new Op(0x8E, "RES 1,(HL)", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b10;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        mmu.wb( reg.hl(), mmu.rb(reg.hl()) & invertedBitmask );
+        mmu.wb( reg.hl(), resetBit(mmu.rb(reg.hl()), 1));
         
         clock.m(4);
         clock.t(16);
@@ -5494,11 +5398,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES2_A = new Op(0x97, "RES 2,A", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b100;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        reg.a( reg.a() & invertedBitmask );
+        reg.a(resetBit(reg.a(), 2));
         
         clock.m(2);
         clock.t(8);
@@ -5506,11 +5407,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES2_B = new Op(0x90, "RES 2,B", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b100;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        reg.b( reg.b() & invertedBitmask );
+        reg.b(resetBit(reg.b(), 2));
         
         clock.m(2);
         clock.t(8);
@@ -5518,11 +5416,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES2_C = new Op(0x91, "RES 2,C", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b100;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        reg.c( reg.c() & invertedBitmask );
+        reg.c( resetBit(reg.c(), 2));
         
         clock.m(2);
         clock.t(8);
@@ -5530,11 +5425,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES2_D = new Op(0x92, "RES 2,D", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b100;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        reg.d( reg.d() & invertedBitmask );
+        reg.d(resetBit(reg.d(), 2));
         
         clock.m(2);
         clock.t(8);
@@ -5542,11 +5434,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES2_E = new Op(0x93, "RES 2,E", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b100;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        reg.e( reg.e() & invertedBitmask );
+        reg.e(resetBit(reg.e(), 2));
         
         clock.m(2);
         clock.t(8);
@@ -5554,11 +5443,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES2_H = new Op(0x94, "RES 2,H", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b100;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        reg.h( reg.h() & invertedBitmask );
+        reg.h(resetBit(reg.h(), 2));
         
         clock.m(2);
         clock.t(8);
@@ -5566,11 +5452,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES2_L = new Op(0x95, "RES 2,L", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b100;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        reg.l( reg.l() & invertedBitmask );
+        reg.l(resetBit(reg.l(), 2));
         
         clock.m(2);
         clock.t(8);
@@ -5578,11 +5461,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES2_HL = new Op(0x96, "RES 2,(HL)", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b100;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        mmu.wb( reg.hl(), mmu.rb(reg.hl()) & invertedBitmask );
+        mmu.wb( reg.hl(), resetBit(mmu.rb(reg.hl()), 2));
         
         clock.m(4);
         clock.t(16);
@@ -5590,11 +5470,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES3_A = new Op(0x9F, "RES 3,A", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b1000;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        reg.a( reg.a() & invertedBitmask );
+        reg.a(resetBit(reg.a(), 3));
         
         clock.m(2);
         clock.t(8);
@@ -5602,11 +5479,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES3_B = new Op(0x98, "RES 3,B", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b1000;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        reg.b( reg.b() & invertedBitmask );
+        reg.b( resetBit(reg.b(), 3) );
         
         clock.m(2);
         clock.t(8);
@@ -5614,11 +5488,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES3_C = new Op(0x99, "RES 3,C", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b1000;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        reg.c( reg.c() & invertedBitmask );
+        reg.c( resetBit(reg.c(), 3) );
         
         clock.m(2);
         clock.t(8);
@@ -5626,11 +5497,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES3_D = new Op(0x9A, "RES 3,D", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b1000;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        reg.d( reg.d() & invertedBitmask );
+        reg.d( resetBit(reg.d(), 3) );
         
         clock.m(2);
         clock.t(8);
@@ -5638,11 +5506,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES3_E = new Op(0x9B, "RES 3,E", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b1000;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        reg.e( reg.e() & invertedBitmask );
+        reg.e( resetBit(reg.e(), 3) );
         
         clock.m(2);
         clock.t(8);
@@ -5650,11 +5515,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES3_H = new Op(0x9C, "RES 3,H", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b1000;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        reg.h( reg.h() & invertedBitmask );
+        reg.h( resetBit(reg.h(), 3) );
         
         clock.m(2);
         clock.t(8);
@@ -5662,11 +5524,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES3_L = new Op(0x9D, "RES 3,L", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b1000;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        reg.l( reg.l() & invertedBitmask );
+        reg.l( resetBit(reg.l(), 3) );
         
         clock.m(2);
         clock.t(8);
@@ -5674,11 +5533,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES3_HL = new Op(0x9E, "RES 3,(HL)", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b1000;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        mmu.wb( reg.hl(), mmu.rb(reg.hl()) & invertedBitmask );
+        mmu.wb( reg.hl(), resetBit(mmu.rb(reg.hl()), 3));
         
         clock.m(4);
         clock.t(16);
@@ -5686,11 +5542,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES4_A = new Op(0xA7, "RES 4,A", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b10000;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        reg.a( reg.a() & invertedBitmask );
+        reg.a( resetBit(reg.a(), 4) );
         
         clock.m(2);
         clock.t(8);
@@ -5698,11 +5551,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES4_B = new Op(0xA0, "RES 4,B", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b10000;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        reg.b( reg.b() & invertedBitmask );
+        reg.b( resetBit(reg.b(), 4) );
         
         clock.m(2);
         clock.t(8);
@@ -5710,11 +5560,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES4_C = new Op(0xA1, "RES 4,C", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b10000;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        reg.c( reg.c() & invertedBitmask );
+        reg.c( resetBit(reg.c(), 4) );
         
         clock.m(2);
         clock.t(8);
@@ -5722,11 +5569,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES4_D = new Op(0xA2, "RES 4,D", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b10000;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        reg.d( reg.d() & invertedBitmask );
+        reg.d( resetBit(reg.d(), 4) );
         
         clock.m(2);
         clock.t(8);
@@ -5734,11 +5578,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES4_E = new Op(0xA3, "RES 4,E", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b10000;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        reg.e( reg.e() & invertedBitmask );
+        reg.e( resetBit(reg.e(), 4) );
         
         clock.m(2);
         clock.t(8);
@@ -5746,11 +5587,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES4_H = new Op(0xA4, "RES 4,H", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b10000;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        reg.h( reg.h() & invertedBitmask );
+        reg.h( resetBit(reg.h(), 4) );
         
         clock.m(2);
         clock.t(8);
@@ -5758,11 +5596,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES4_L = new Op(0xA5, "RES 4,L", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b10000;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        reg.l( reg.l() & invertedBitmask );
+        reg.l( resetBit(reg.l(), 4) );
         
         clock.m(2);
         clock.t(8);
@@ -5770,11 +5605,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES4_HL = new Op(0xA6, "RES 4,(HL)", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b10000;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        mmu.wb( reg.hl(), mmu.rb(reg.hl()) & invertedBitmask );
+        mmu.wb( reg.hl(), resetBit(mmu.rb(reg.hl()), 4) );
         
         clock.m(4);
         clock.t(16);
@@ -5782,11 +5614,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES5_A = new Op(0xAF, "RES 5,A", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b100000;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        reg.a( reg.a() & invertedBitmask );
+        reg.a( resetBit(reg.a(), 5) );
         
         clock.m(2);
         clock.t(8);
@@ -5794,11 +5623,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES5_B = new Op(0xA8, "RES 5,B", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b100000;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        reg.b( reg.b() & invertedBitmask );
+        reg.b( resetBit(reg.b(), 5) );
         
         clock.m(2);
         clock.t(8);
@@ -5806,11 +5632,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES5_C = new Op(0xA9, "RES 5,C", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b100000;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        reg.c( reg.c() & invertedBitmask );
+        reg.c( resetBit(reg.c(), 5) );
         
         clock.m(2);
         clock.t(8);
@@ -5818,11 +5641,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES5_D = new Op(0xAA, "RES 5,D", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b100000;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        reg.d( reg.d() & invertedBitmask );
+        reg.d( resetBit(reg.d(), 5) );
         
         clock.m(2);
         clock.t(8);
@@ -5830,11 +5650,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES5_E = new Op(0xAB, "RES 5,E", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b100000;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        reg.e( reg.e() & invertedBitmask );
+        reg.e( resetBit(reg.e(), 5) );
         
         clock.m(2);
         clock.t(8);
@@ -5842,11 +5659,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES5_H = new Op(0xAC, "RES 5,H", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b100000;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        reg.h( reg.h() & invertedBitmask );
+        reg.h( resetBit(reg.h(), 5) );
         
         clock.m(2);
         clock.t(8);
@@ -5854,11 +5668,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES5_L = new Op(0xAD, "RES 5,L", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b100000;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        reg.l( reg.l() & invertedBitmask );
+        reg.l( resetBit(reg.l(), 5) );
         
         clock.m(2);
         clock.t(8);
@@ -5866,11 +5677,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES5_HL = new Op(0xAE, "RES 5,(HL)", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b100000;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        mmu.wb( reg.hl(), mmu.rb(reg.hl()) & invertedBitmask );
+        mmu.wb( reg.hl(), resetBit(mmu.rb(reg.hl()), 5) );
         
         clock.m(4);
         clock.t(16);
@@ -5878,11 +5686,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES6_A = new Op(0xB7, "RES 6,A", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b1000000;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        reg.a( reg.a() & invertedBitmask );
+        reg.a( resetBit(reg.a(), 6) );
         
         clock.m(2);
         clock.t(8);
@@ -5890,11 +5695,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES6_B = new Op(0xB0, "RES 6,B", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b1000000;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        reg.b( reg.b() & invertedBitmask );
+        reg.b( resetBit(reg.b(), 6) );
         
         clock.m(2);
         clock.t(8);
@@ -5902,11 +5704,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES6_C = new Op(0xB1, "RES 6,C", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b1000000;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        reg.c( reg.c() & invertedBitmask );
+        reg.c( resetBit(reg.c(), 6) );
         
         clock.m(2);
         clock.t(8);
@@ -5914,11 +5713,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES6_D = new Op(0xB2, "RES 6,D", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b1000000;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        reg.d( reg.d() & invertedBitmask );
+        reg.d( resetBit(reg.d(), 6) );
         
         clock.m(2);
         clock.t(8);
@@ -5926,11 +5722,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES6_E = new Op(0xB3, "RES 6,E", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b1000000;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        reg.e( reg.e() & invertedBitmask );
+        reg.e( resetBit(reg.e(), 6) );
         
         clock.m(2);
         clock.t(8);
@@ -5938,11 +5731,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES6_H = new Op(0xB4, "RES 6,H", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b1000000;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        reg.h( reg.h() & invertedBitmask );
+        reg.h( resetBit(reg.h(), 6) );
         
         clock.m(2);
         clock.t(8);
@@ -5950,11 +5740,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES6_L = new Op(0xB5, "RES 6,L", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b1000000;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        reg.l( reg.l() & invertedBitmask );
+        reg.l( resetBit(reg.l(), 6) );
         
         clock.m(2);
         clock.t(8);
@@ -5962,11 +5749,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES6_HL = new Op(0xB6, "RES 6,(HL)", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b1000000;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        mmu.wb( reg.hl(), mmu.rb(reg.hl()) & invertedBitmask );
+        mmu.wb( reg.hl(), resetBit(mmu.rb(reg.hl()), 6) );
         
         clock.m(4);
         clock.t(16);
@@ -5974,11 +5758,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES7_A = new Op(0xBF, "RES 7,A", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b10000000;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        reg.a( reg.a() & invertedBitmask );
+        reg.a( resetBit(reg.a(), 7) );
         
         clock.m(2);
         clock.t(8);
@@ -5986,11 +5767,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES7_B = new Op(0xB8, "RES 7,B", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b10000000;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        reg.b( reg.b() & invertedBitmask );
+        reg.b( resetBit(reg.b(), 7) );
         
         clock.m(2);
         clock.t(8);
@@ -5998,11 +5776,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES7_C = new Op(0xB9, "RES 7,C", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b10000000;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        reg.c( reg.c() & invertedBitmask );
+        reg.c( resetBit(reg.c(), 7) );
         
         clock.m(2);
         clock.t(8);
@@ -6010,11 +5785,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES7_D = new Op(0xBA, "RES 7,D", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b10000000;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        reg.d( reg.d() & invertedBitmask );
+        reg.d( resetBit(reg.d(), 7) );
         
         clock.m(2);
         clock.t(8);
@@ -6022,11 +5794,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES7_E = new Op(0xBB, "RES 7,E", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b10000000;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        reg.e( reg.e() & invertedBitmask );
+        reg.e( resetBit(reg.e(), 7) );
         
         clock.m(2);
         clock.t(8);
@@ -6034,11 +5803,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES7_H = new Op(0xBC, "RES 7,H", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b10000000;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        reg.h( reg.h() & invertedBitmask );
+        reg.h( resetBit(reg.h(), 7) );
         
         clock.m(2);
         clock.t(8);
@@ -6046,11 +5812,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES7_L = new Op(0xBD, "RES 7,L", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b10000000;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        reg.l( reg.l() & invertedBitmask );
+        reg.l( resetBit(reg.l(), 7) );
         
         clock.m(2);
         clock.t(8);
@@ -6058,11 +5821,8 @@ public class Opcodes {
     
     //Reset the bit b in register r
     Op RES7_HL = new Op(0xBE, "RES 7,(HL)", cbmap, () -> {
-        //Bit 0 bitmask
-        int bitmask = 0b10000000;
-        int invertedBitmask = ~bitmask & 0xFF;
         //Reset value
-        mmu.wb( reg.hl(), mmu.rb(reg.hl()) & invertedBitmask );
+        mmu.wb( reg.hl(), resetBit(mmu.rb(reg.hl()), 7) );
         
         clock.m(4);
         clock.t(16);

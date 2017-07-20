@@ -40,6 +40,7 @@ public class CartridgeFactory {
             }
             
             Cartridge c = new Cartridge(unsignedBytes);
+            c.source = f;
             
             return c;
         }
