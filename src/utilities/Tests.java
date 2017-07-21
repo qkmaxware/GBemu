@@ -292,6 +292,8 @@ public class Tests {
             failed.add(op);
         gb.Reset();
         
+        //TODO remaining opcodes
+        
         //To Test CB opcodes, I will test the utility helper functions
         int s0 = 0b00000001;
         if(gb.cpu.opcodes.setBit(0, 0) != s0)
@@ -340,6 +342,17 @@ public class Tests {
             System.out.println("Failed to set bit 7");
         if(gb.cpu.opcodes.resetBit(s0, 7) != 0)
             System.out.println("Failed to unset bit 7");
+        
+        int s = 1;
+        if(gb.cpu.opcodes.shiftLeft(s) != 2)
+            System.out.println("Left shift failed");
+
+        s = 0x80;
+        if(gb.cpu.opcodes.shiftRight0(s) != 0x40)
+            System.out.println("Right shift 0 padded failed");
+        
+        if(gb.cpu.opcodes.shiftRightExtend(s) != 0xC0)
+            System.out.println("Right shift extend failed");
         
         System.out.println("Failed: "+failed.toString());
     }

@@ -97,6 +97,6 @@ public class Gameboy {
     }
     
     public String toString(){
-        return cpu.recentOps.getLast().toString() + " WITH "+ cpu.reg.toString();
+        return cpu.recentOps.getLast() + " WITH "+ cpu.reg.toString();
     }
 }

@@ -87,25 +87,17 @@ public class Opcodes {
     //--------------------------------------------------------------------------
     
     private void rsv(){
-        cpp.a(reg.a());
-        cpp.b(reg.b());
-        cpp.c(reg.c());
-        cpp.d(reg.d());
-        cpp.e(reg.e());
-        cpp.f(reg.f());
-        cpp.h(reg.h());
-        cpp.l(reg.l());
+        cpp.a(reg.a()); cpp.b(reg.b());
+        cpp.c(reg.c()); cpp.d(reg.d());
+        cpp.e(reg.e()); cpp.f(reg.f());
+        cpp.h(reg.h()); cpp.l(reg.l());
     }
     
     private void rrs(){
-        reg.a(cpp.a());
-        reg.b(cpp.b());
-        reg.c(cpp.c());
-        reg.d(cpp.d());
-        reg.e(cpp.e());
-        reg.f(cpp.f());
-        reg.h(cpp.h());
-        reg.l(cpp.l());
+        reg.a(cpp.a()); reg.b(cpp.b());
+        reg.c(cpp.c()); reg.d(cpp.d());
+        reg.e(cpp.e()); reg.f(cpp.f());
+        reg.h(cpp.h()); reg.l(cpp.l());
     }
     
     private boolean isHalfCarry(int a, int b){
@@ -140,6 +132,134 @@ public class Opcodes {
     
     private boolean isZero(int i){
         return isZero(i, Metrics.BIT8);
+    }
+    
+    //Compare two values and set the flags accordingly
+    public void compare(int a, int b){
+        int c = a - b;
+        
+        reg.zero(isZero(c));                //If result is zero, set the zero flag
+        reg.subtract(true);                 //Subtract is always set to true
+        reg.halfcarry(isHalfCarry(a, -b));  //Set the half carry flag
+        reg.carry(c < 0);                   //Set the carry flag if c < 0
+    }
+    
+    //Check if a particular bit is set
+    public void testBit(int v, int bit){
+        int mask = 1 << bit;
+        //Set is bit 'b' of register r is 0;
+        reg.zero((v & mask) == 0);
+        reg.subtract(false);
+        reg.halfcarry(true);
+    }
+    
+    //Set a bit to 0
+    public int resetBit(int i, int bit){
+        int mask = ~(1 << bit);
+        return i & mask;
+    }
+    
+    //Set a bit to 1
+    public int setBit(int i, int bit){
+        int mask = 1 << bit;
+        return i | mask;
+    }
+    
+    //Rotate right 9Bit with carry
+    public int rotateRight(int value){
+        //9Bit rotation to the right, the carry is copied into bit 7
+        boolean carry = reg.carry();
+        boolean leaving = (value & 0x1) != 0;
+        int shift = ((value >> 1) | (carry ? 0x80 : 0)) & 0xFF;
+        
+        reg.carry(leaving);
+        reg.subtract(false);
+        reg.halfcarry(false);
+        reg.zero(isZero(shift));
+        
+        return shift;
+    }
+    
+    //Rotate left 9Bit with carry
+    public int rotateLeft(int value){
+        //9Bit rotation to the right, the carry is copied into bit 7
+        boolean carry = reg.carry();
+        boolean leaving = (value & 0x80) != 0;
+        int shift = ((value << 1) | (carry ? 0x1 : 0)) & 0xFF;
+        
+        reg.carry(leaving);
+        reg.subtract(false);
+        reg.halfcarry(false);
+        reg.zero(isZero(shift));
+        
+        return shift;
+    }
+    
+    //Rotate right 8Bit without carry
+    public int rotateRightCarry(int value){
+        boolean leaving = (value & 0x1) != 0;
+        int shift = ((value >> 1) | (leaving ? 0x80 : 0)) & 0xFF;
+        
+        reg.zero(isZero(shift));
+        reg.subtract(false);
+        reg.halfcarry(false);
+        reg.carry(leaving);
+        
+        return shift;
+    }
+    
+    //Rotate left 8Bit without carry
+    public int rotateLeftCarry(int value){
+        boolean leaving = (value & 0x80) != 0;
+        int shift = ((value << 1) | (leaving ? 1 : 0)) & 0xFF;
+        
+        reg.zero(isZero(shift));
+        reg.subtract(false);
+        reg.halfcarry(false);
+        reg.carry(leaving);
+        
+        return shift;
+    }
+    
+    //Shift to the Left filling 0's in the lower bit
+    public int shiftLeft(int value){
+        int shift = (value << 1) & 0xFF;
+        boolean bit7 = (value & 0x80) != 0;
+        
+        reg.zero(isZero(shift));
+        reg.subtract(false);
+        reg.halfcarry(false);
+        reg.carry(bit7);
+        
+        return shift;
+    }
+    
+    //Shift to the right, 0's in the upper bit
+    public int shiftRight0(int value){
+        int shift = (value >> 1) & 0b01111111;
+        boolean bit0 = (value & 0x1) != 0;
+        
+        reg.zero(isZero(shift));
+        reg.subtract(false);
+        reg.halfcarry(false);
+        reg.carry(bit0);
+    
+        return shift;
+    }
+    
+    //Shift to the right, bit 7 preserved
+    public int shiftRightExtend(int value){
+        int shift = (value >> 1) & 0xFF;
+        boolean bit0 = (value & 0x1) != 0;
+        int bit7 = value & 0x80;    //Preserve bit 7 value
+        shift = shift | bit7;
+        
+        reg.zero(isZero(shift));
+        reg.subtract(false);
+        reg.halfcarry(false);
+        reg.carry(bit0);
+    
+        return shift;
     }
     
     //--------------------------------------------------------------------------
@@ -2051,10 +2171,7 @@ public class Opcodes {
         int n = reg.a();
         int a = reg.a();
             
-        reg.zero((n & Metrics.BIT8) == (a & Metrics.BIT8));
-        reg.subtract(true);
-        reg.halfcarry(isHalfCarry(a, -n));
-        reg.carry((a & Metrics.BIT8) < (n & Metrics.BIT8));
+        compare(a,n);
         
         clock.m(1);
         clock.t(4);
@@ -2065,10 +2182,7 @@ public class Opcodes {
         int n = reg.b();
         int a = reg.a();
             
-        reg.zero((n & Metrics.BIT8) == (a & Metrics.BIT8));
-        reg.subtract(true);
-        reg.halfcarry(isHalfCarry(a, -n));
-        reg.carry((a & Metrics.BIT8) < (n & Metrics.BIT8));
+        compare(a,n);
         
         clock.m(1);
         clock.t(4);
@@ -2079,10 +2193,7 @@ public class Opcodes {
         int n = reg.c();
         int a = reg.a();
             
-        reg.zero((n & Metrics.BIT8) == (a & Metrics.BIT8));
-        reg.subtract(true);
-        reg.halfcarry(isHalfCarry(a, -n));
-        reg.carry((a & Metrics.BIT8) < (n & Metrics.BIT8));
+        compare(a,n);
         
         clock.m(1);
         clock.t(4);
@@ -2093,10 +2204,7 @@ public class Opcodes {
         int n = reg.d();
         int a = reg.a();
             
-        reg.zero((n & Metrics.BIT8) == (a & Metrics.BIT8));
-        reg.subtract(true);
-        reg.halfcarry(isHalfCarry(a, -n));
-        reg.carry((a & Metrics.BIT8) < (n & Metrics.BIT8));
+        compare(a,n);
         
         clock.m(1);
         clock.t(4);
@@ -2107,10 +2215,7 @@ public class Opcodes {
         int n = reg.e();
         int a = reg.a();
             
-        reg.zero((n & Metrics.BIT8) == (a & Metrics.BIT8));
-        reg.subtract(true);
-        reg.halfcarry(isHalfCarry(a, -n));
-        reg.carry((a & Metrics.BIT8) < (n & Metrics.BIT8));
+        compare(a,n);
         
         clock.m(1);
         clock.t(4);
@@ -2121,10 +2226,7 @@ public class Opcodes {
         int n = reg.h();
         int a = reg.a();
             
-        reg.zero((n & Metrics.BIT8) == (a & Metrics.BIT8));
-        reg.subtract(true);
-        reg.halfcarry(isHalfCarry(a, -n));
-        reg.carry((a & Metrics.BIT8) < (n & Metrics.BIT8));
+        compare(a,n);
         
         clock.m(1);
         clock.t(4);
@@ -2135,10 +2237,7 @@ public class Opcodes {
         int n = reg.l();
         int a = reg.a();
             
-        reg.zero((n & Metrics.BIT8) == (a & Metrics.BIT8));
-        reg.subtract(true);
-        reg.halfcarry(isHalfCarry(a, -n));
-        reg.carry((a & Metrics.BIT8) < (n & Metrics.BIT8));
+        compare(a,n);
         
         clock.m(1);
         clock.t(4);
@@ -2149,10 +2248,7 @@ public class Opcodes {
         int n = mmu.rb(reg.hl());
         int a = reg.a();
             
-        reg.zero((n & Metrics.BIT8) == (a & Metrics.BIT8));
-        reg.subtract(true);
-        reg.halfcarry(isHalfCarry(a, -n));
-        reg.carry((a & Metrics.BIT8) < (n & Metrics.BIT8));
+        compare(a,n);
         
         clock.m(2);
         clock.t(8);
@@ -2164,10 +2260,7 @@ public class Opcodes {
         int a = reg.a();
         reg.pcpp(1);    
         
-        reg.zero((n & Metrics.BIT8) == (a & Metrics.BIT8));
-        reg.subtract(true);
-        reg.halfcarry(isHalfCarry(a, -n));
-        reg.carry((a & Metrics.BIT8) < (n & Metrics.BIT8));
+        compare(a,n);
         
         clock.m(2);
         clock.t(8);
@@ -2759,15 +2852,15 @@ public class Opcodes {
     ///
     // Rotates and Shifts
     ///
-    
+    //MARK
     //Rotate A left, old bit 7 to Carry flag
     Op RLCA = new Op(0x07, "RCLA", map, () -> {
         int a = reg.a();
         boolean carry = ((a & 0x80) != 0);
-        a = (a << 1) + (carry ? 1: 0);
+        a = (a << 1) | (carry ? 1: 0);
         reg.a(a);
         
-        reg.zero(isZero(a));
+        reg.zero(isZero(a)); //Ive read that Z is preserved
         reg.subtract(false);
         reg.halfcarry(false);
         reg.carry(carry);
@@ -2780,10 +2873,10 @@ public class Opcodes {
     Op RLA = new Op(0x17, "RLA", map, () -> {
         int a = reg.a();
         boolean carry = ((a & 0x80) != 0);
-        a = (a << 1) + (reg.carry() ? 1 : 0);
+        a = (a << 1) | (reg.carry() ? 1 : 0);
         reg.a(a);
         
-        reg.zero(isZero(a));
+        reg.zero(isZero(a)); //Ive read that Z is preserved
         reg.subtract(false);
         reg.halfcarry(false);
         reg.carry(carry);
@@ -2796,10 +2889,10 @@ public class Opcodes {
     Op RRCA = new Op(0x0F, "RRCA", map, () -> {
         int a = reg.a();
         boolean toCarry = ((a & 0b1) != 0);
-        a = (a >> 1) + (toCarry ? 0x80 : 0);
+        a = (a >> 1) | (toCarry ? 0x80 : 0);
         reg.a(a);
         
-        reg.zero(isZero(a));
+        reg.zero(isZero(a)); //Ive read that Z is preserved
         reg.subtract(false);
         reg.halfcarry(false);
         reg.carry(toCarry);
@@ -2812,20 +2905,17 @@ public class Opcodes {
     Op RRA = new Op(0x1F, "RRA", map, () -> {
         int a = reg.a();
         boolean toCarry = ((a & 0b1) != 0);
-        a = (a >> 1) + (reg.carry() ? 0x80 : 0);
+        a = (a >> 1) | (reg.carry() ? 0x80 : 0);
         reg.a(a);
         
-        reg.zero(isZero(a));
+        reg.zero(isZero(a)); //Ive read that Z is preserved
         reg.subtract(false);
         reg.halfcarry(false);
         reg.carry(toCarry);
         
         clock.m(1);
         clock.t(4);
-    });
-    
-    //TODO PAGE 101
-    
+    }); 
     
     ///
     // Jumps
@@ -3291,15 +3381,8 @@ public class Opcodes {
     
     //Rotate register A left
     Op RLC_A = new Op(0x07, "RLC A", cbmap, () -> {
-        int a = reg.a();
-        boolean carry = ((a & 0x80) != 0);
-        a = (a << 1) + (carry ? 1: 0);
+        int a = rotateLeftCarry(reg.a());
         reg.a(a);
-        
-        reg.zero(isZero(a));
-        reg.subtract(false);
-        reg.halfcarry(false);
-        reg.carry(carry);
 
         clock.m(2);
         clock.t(8);
@@ -3307,15 +3390,8 @@ public class Opcodes {
     
     //Rotate register B left
     Op RLC_B = new Op(0x00, "RLC B", cbmap, () -> {
-        int a = reg.b();
-        boolean carry = ((a & 0x80) != 0);
-        a = (a << 1) + (carry ? 1: 0);
+        int a = rotateLeftCarry(reg.b());
         reg.b(a);
-        
-        reg.zero(isZero(a));
-        reg.subtract(false);
-        reg.halfcarry(false);
-        reg.carry(carry);
 
         clock.m(2);
         clock.t(8);
@@ -3323,15 +3399,8 @@ public class Opcodes {
     
     //Rotate register C left
     Op RLC_C = new Op(0x01, "RLC C", cbmap, () -> {
-        int a = reg.c();
-        boolean carry = ((a & 0x80) != 0);
-        a = (a << 1) + (carry ? 1: 0);
+        int a = rotateLeftCarry(reg.c());
         reg.c(a);
-        
-        reg.zero(isZero(a));
-        reg.subtract(false);
-        reg.halfcarry(false);
-        reg.carry(carry);
 
         clock.m(2);
         clock.t(8);
@@ -3339,15 +3408,8 @@ public class Opcodes {
     
     //Rotate register D left
     Op RLC_D = new Op(0x02, "RLC D", cbmap, () -> {
-        int a = reg.d();
-        boolean carry = ((a & 0x80) != 0);
-        a = (a << 1) + (carry ? 1: 0);
+        int a = rotateLeftCarry(reg.d());
         reg.d(a);
-        
-        reg.zero(isZero(a));
-        reg.subtract(false);
-        reg.halfcarry(false);
-        reg.carry(carry);
 
         clock.m(2);
         clock.t(8);
@@ -3355,15 +3417,8 @@ public class Opcodes {
     
     //Rotate register E left
     Op RLC_E = new Op(0x03, "RLC E", cbmap, () -> {
-        int a = reg.e();
-        boolean carry = ((a & 0x80) != 0);
-        a = (a << 1) + (carry ? 1: 0);
+        int a = rotateLeftCarry(reg.e());
         reg.e(a);
-        
-        reg.zero(isZero(a));
-        reg.subtract(false);
-        reg.halfcarry(false);
-        reg.carry(carry);
 
         clock.m(2);
         clock.t(8);
@@ -3371,15 +3426,8 @@ public class Opcodes {
     
     //Rotate register H left
     Op RLC_H = new Op(0x04, "RLC H", cbmap, () -> {
-        int a = reg.h();
-        boolean carry = ((a & 0x80) != 0);
-        a = (a << 1) + (carry ? 1: 0);
+        int a = rotateLeftCarry(reg.h());
         reg.h(a);
-        
-        reg.zero(isZero(a));
-        reg.subtract(false);
-        reg.halfcarry(false);
-        reg.carry(carry);
 
         clock.m(2);
         clock.t(8);
@@ -3387,15 +3435,8 @@ public class Opcodes {
     
     //Rotate register L left
     Op RLC_L = new Op(0x05, "RLC L", cbmap, () -> {
-        int a = reg.l();
-        boolean carry = ((a & 0x80) != 0);
-        a = (a << 1) + (carry ? 1: 0);
+        int a = rotateLeftCarry(reg.l());
         reg.l(a);
-        
-        reg.zero(isZero(a));
-        reg.subtract(false);
-        reg.halfcarry(false);
-        reg.carry(carry);
 
         clock.m(2);
         clock.t(8);
@@ -3403,15 +3444,8 @@ public class Opcodes {
     
     //Rotate memory location at HL left
     Op RLC_HL = new Op(0x06, "RLC (HL)", cbmap, () -> {
-        int a = mmu.rb(reg.hl());
-        boolean carry = ((a & 0x80) != 0);
-        a = (a << 1) + (carry ? 1: 0);
+        int a = rotateLeftCarry(mmu.rb(reg.hl()));
         mmu.wb(reg.hl(), a);
-        
-        reg.zero(isZero(a));
-        reg.subtract(false);
-        reg.halfcarry(false);
-        reg.carry(carry);
 
         clock.m(4);
         clock.t(16);
@@ -3419,15 +3453,8 @@ public class Opcodes {
     
     //Rotate register A left through the carry flag
     Op RL_A = new Op(0x17, "RL A", cbmap, () -> {
-        int a = reg.a();
-        boolean carry = ((a & 0x80) != 0);
-        a = (a << 1) + (reg.carry() ? 1 : 0);
+        int a = rotateLeft(reg.a());
         reg.a(a);
-        
-        reg.zero(isZero(a));
-        reg.subtract(false);
-        reg.halfcarry(false);
-        reg.carry(carry);
         
         clock.m(2);
         clock.t(8);
@@ -3435,15 +3462,8 @@ public class Opcodes {
     
     //Rotate register B left through the carry flag
     Op RL_B = new Op(0x10, "RL B", cbmap, () -> {
-        int a = reg.b();
-        boolean carry = ((a & 0x80) != 0);
-        a = (a << 1) + (reg.carry() ? 1 : 0);
+        int a = rotateLeft(reg.b());
         reg.b(a);
-        
-        reg.zero(isZero(a));
-        reg.subtract(false);
-        reg.halfcarry(false);
-        reg.carry(carry);
         
         clock.m(2);
         clock.t(8);
@@ -3451,15 +3471,8 @@ public class Opcodes {
     
     //Rotate register C left through the carry flag
     Op RL_C = new Op(0x11, "RL C", cbmap, () -> {
-        int a = reg.c();
-        boolean carry = ((a & 0x80) != 0);
-        a = (a << 1) + (reg.carry() ? 1 : 0);
+        int a = rotateLeft(reg.c());
         reg.c(a);
-        
-        reg.zero(isZero(a));
-        reg.subtract(false);
-        reg.halfcarry(false);
-        reg.carry(carry);
         
         clock.m(2);
         clock.t(8);
@@ -3467,15 +3480,8 @@ public class Opcodes {
     
     //Rotate register D left through the carry flag
     Op RL_D = new Op(0x12, "RL D", cbmap, () -> {
-        int a = reg.d();
-        boolean carry = ((a & 0x80) != 0);
-        a = (a << 1) + (reg.carry() ? 1 : 0);
+        int a = rotateLeft(reg.d());
         reg.d(a);
-        
-        reg.zero(isZero(a));
-        reg.subtract(false);
-        reg.halfcarry(false);
-        reg.carry(carry);
         
         clock.m(2);
         clock.t(8);
@@ -3483,15 +3489,8 @@ public class Opcodes {
     
     //Rotate register E left through the carry flag
     Op RL_E = new Op(0x13, "RL E", cbmap, () -> {
-        int a = reg.e();
-        boolean carry = ((a & 0x80) != 0);
-        a = (a << 1) + (reg.carry() ? 1 : 0);
+        int a = rotateLeft(reg.e());
         reg.e(a);
-        
-        reg.zero(isZero(a));
-        reg.subtract(false);
-        reg.halfcarry(false);
-        reg.carry(carry);
         
         clock.m(2);
         clock.t(8);
@@ -3499,15 +3498,8 @@ public class Opcodes {
     
     //Rotate register H left through the carry flag
     Op RL_H = new Op(0x14, "RL H", cbmap, () -> {
-        int a = reg.h();
-        boolean carry = ((a & 0x80) != 0);
-        a = (a << 1) + (reg.carry() ? 1 : 0);
+        int a = rotateLeft(reg.h());
         reg.h(a);
-        
-        reg.zero(isZero(a));
-        reg.subtract(false);
-        reg.halfcarry(false);
-        reg.carry(carry);
         
         clock.m(2);
         clock.t(8);
@@ -3515,15 +3507,8 @@ public class Opcodes {
     
     //Rotate register L left through the carry flag
     Op RL_L = new Op(0x15, "RL L", cbmap, () -> {
-        int a = reg.l();
-        boolean carry = ((a & 0x80) != 0);
-        a = (a << 1) + (reg.carry() ? 1 : 0);
+        int a = rotateLeft(reg.l());
         reg.l(a);
-        
-        reg.zero(isZero(a));
-        reg.subtract(false);
-        reg.halfcarry(false);
-        reg.carry(carry);
         
         clock.m(2);
         clock.t(8);
@@ -3531,15 +3516,8 @@ public class Opcodes {
     
     //Rotate memry at HL left through the carry flag
     Op RL_HL = new Op(0x16, "RL (HL)", cbmap, () -> {
-        int a = mmu.rb(reg.hl());
-        boolean carry = ((a & 0x80) != 0);
-        a = (a << 1) + (reg.carry() ? 1 : 0);
+        int a = rotateLeft(mmu.rb(reg.hl()));
         mmu.wb(reg.hl(), a);
-        
-        reg.zero(isZero(a));
-        reg.subtract(false);
-        reg.halfcarry(false);
-        reg.carry(carry);
         
         clock.m(4);
         clock.t(16);
@@ -3547,15 +3525,8 @@ public class Opcodes {
     
     //Rotate A right though the carry flag, old bit 0 to carry flag
     Op RR_A = new Op(0x1F, "RR A", cbmap, () -> {
-        int a = reg.a();
-        boolean toCarry = ((a & 0b1) != 0);
-        a = (a >> 1) + (reg.carry() ? 0x80 : 0);
+        int a = rotateRight(reg.a());
         reg.a(a);
-        
-        reg.zero(isZero(a));
-        reg.subtract(false);
-        reg.halfcarry(false);
-        reg.carry(toCarry);
         
         clock.m(2);
         clock.t(8);
@@ -3563,15 +3534,8 @@ public class Opcodes {
     
     //Rotate B right though the carry flag, old bit 0 to carry flag
     Op RR_B = new Op(0x18, "RR B", cbmap, () -> {
-        int a = reg.b();
-        boolean toCarry = ((a & 0b1) != 0);
-        a = (a >> 1) + (reg.carry() ? 0x80 : 0);
+        int a = rotateRight(reg.b());
         reg.b(a);
-        
-        reg.zero(isZero(a));
-        reg.subtract(false);
-        reg.halfcarry(false);
-        reg.carry(toCarry);
         
         clock.m(2);
         clock.t(8);
@@ -3579,15 +3543,8 @@ public class Opcodes {
     
     //Rotate C right though the carry flag, old bit 0 to carry flag
     Op RR_C = new Op(0x19, "RR C", cbmap, () -> {
-        int a = reg.c();
-        boolean toCarry = ((a & 0b1) != 0);
-        a = (a >> 1) + (reg.carry() ? 0x80 : 0);
+        int a = rotateRight(reg.c());
         reg.c(a);
-        
-        reg.zero(isZero(a));
-        reg.subtract(false);
-        reg.halfcarry(false);
-        reg.carry(toCarry);
         
         clock.m(2);
         clock.t(8);
@@ -3595,15 +3552,8 @@ public class Opcodes {
     
     //Rotate D right though the carry flag, old bit 0 to carry flag
     Op RR_D = new Op(0x1A, "RR D", cbmap, () -> {
-        int a = reg.d();
-        boolean toCarry = ((a & 0b1) != 0);
-        a = (a >> 1) + (reg.carry() ? 0x80 : 0);
+        int a = rotateRight(reg.d());
         reg.d(a);
-        
-        reg.zero(isZero(a));
-        reg.subtract(false);
-        reg.halfcarry(false);
-        reg.carry(toCarry);
         
         clock.m(2);
         clock.t(8);
@@ -3611,15 +3561,8 @@ public class Opcodes {
     
     //Rotate E right though the carry flag, old bit 0 to carry flag
     Op RR_E = new Op(0x1B, "RR E", cbmap, () -> {
-        int a = reg.e();
-        boolean toCarry = ((a & 0b1) != 0);
-        a = (a >> 1) + (reg.carry() ? 0x80 : 0);
+        int a = rotateRight(reg.e());
         reg.e(a);
-        
-        reg.zero(isZero(a));
-        reg.subtract(false);
-        reg.halfcarry(false);
-        reg.carry(toCarry);
         
         clock.m(2);
         clock.t(8);
@@ -3627,15 +3570,8 @@ public class Opcodes {
     
     //Rotate H right though the carry flag, old bit 0 to carry flag
     Op RR_H = new Op(0x1C, "RR H", cbmap, () -> {
-        int a = reg.h();
-        boolean toCarry = ((a & 0b1) != 0);
-        a = (a >> 1) + (reg.carry() ? 0x80 : 0);
+        int a = rotateRight(reg.h());
         reg.h(a);
-        
-        reg.zero(isZero(a));
-        reg.subtract(false);
-        reg.halfcarry(false);
-        reg.carry(toCarry);
         
         clock.m(2);
         clock.t(8);
@@ -3643,15 +3579,8 @@ public class Opcodes {
     
     //Rotate L right though the carry flag, old bit 0 to carry flag
     Op RR_L = new Op(0x1D, "RR L", cbmap, () -> {
-        int a = reg.l();
-        boolean toCarry = ((a & 0b1) != 0);
-        a = (a >> 1) + (reg.carry() ? 0x80 : 0);
+        int a = rotateRight(reg.l());
         reg.l(a);
-        
-        reg.zero(isZero(a));
-        reg.subtract(false);
-        reg.halfcarry(false);
-        reg.carry(toCarry);
         
         clock.m(2);
         clock.t(8);
@@ -3659,15 +3588,8 @@ public class Opcodes {
     
     //Rotate memory HL right though the carry flag, old bit 0 to carry flag
     Op RR_HL = new Op(0x1E, "RR (HL)", cbmap, () -> {
-        int a = mmu.rb(reg.hl());
-        boolean toCarry = ((a & 0b1) != 0);
-        a = (a >> 1) + (reg.carry() ? 0x80 : 0);
+        int a = rotateRight(mmu.rb(reg.hl()));
         mmu.wb(reg.hl(), a);
-        
-        reg.zero(isZero(a));
-        reg.subtract(false);
-        reg.halfcarry(false);
-        reg.carry(toCarry);
         
         clock.m(4);
         clock.t(16);
@@ -3675,15 +3597,8 @@ public class Opcodes {
     
     //Rotate A right, old bit 0 to carry flag
     Op RRC_A = new Op(0x0F, "RRC A", cbmap, () -> {
-        int a = reg.a();
-        boolean toCarry = ((a & 0b1) != 0);
-        a = (a >> 1) + (toCarry ? 0x80 : 0);
+        int a = rotateRightCarry(reg.a());
         reg.a(a);
-        
-        reg.zero(isZero(a));
-        reg.subtract(false);
-        reg.halfcarry(false);
-        reg.carry(toCarry);
         
         clock.m(2);
         clock.t(8);
@@ -3691,15 +3606,8 @@ public class Opcodes {
     
     //Rotate B right, old bit 0 to carry flag
     Op RRC_B = new Op(0x08, "RRC B", cbmap, () -> {
-        int a = reg.b();
-        boolean toCarry = ((a & 0b1) != 0);
-        a = (a >> 1) + (toCarry ? 0x80 : 0);
+        int a = rotateRightCarry(reg.b());
         reg.b(a);
-        
-        reg.zero(isZero(a));
-        reg.subtract(false);
-        reg.halfcarry(false);
-        reg.carry(toCarry);
         
         clock.m(2);
         clock.t(8);
@@ -3707,15 +3615,8 @@ public class Opcodes {
     
     //Rotate C right, old bit 0 to carry flag
     Op RRC_C = new Op(0x09, "RRC C", cbmap, () -> {
-        int a = reg.c();
-        boolean toCarry = ((a & 0b1) != 0);
-        a = (a >> 1) + (toCarry ? 0x80 : 0);
+        int a = rotateRightCarry(reg.c());
         reg.c(a);
-        
-        reg.zero(isZero(a));
-        reg.subtract(false);
-        reg.halfcarry(false);
-        reg.carry(toCarry);
         
         clock.m(2);
         clock.t(8);
@@ -3723,15 +3624,8 @@ public class Opcodes {
     
     //Rotate D right, old bit 0 to carry flag
     Op RRC_D = new Op(0x0A, "RRC D", cbmap, () -> {
-        int a = reg.d();
-        boolean toCarry = ((a & 0b1) != 0);
-        a = (a >> 1) + (toCarry ? 0x80 : 0);
+        int a = rotateRightCarry(reg.d());
         reg.d(a);
-        
-        reg.zero(isZero(a));
-        reg.subtract(false);
-        reg.halfcarry(false);
-        reg.carry(toCarry);
         
         clock.m(2);
         clock.t(8);
@@ -3739,15 +3633,8 @@ public class Opcodes {
     
     //Rotate E right, old bit 0 to carry flag
     Op RRC_E = new Op(0x0B, "RRC E", cbmap, () -> {
-        int a = reg.e();
-        boolean toCarry = ((a & 0b1) != 0);
-        a = (a >> 1) + (toCarry ? 0x80 : 0);
+        int a = rotateRightCarry(reg.e());
         reg.e(a);
-        
-        reg.zero(isZero(a));
-        reg.subtract(false);
-        reg.halfcarry(false);
-        reg.carry(toCarry);
         
         clock.m(2);
         clock.t(8);
@@ -3755,15 +3642,8 @@ public class Opcodes {
     
     //Rotate H right, old bit 0 to carry flag
     Op RRC_H = new Op(0x0C, "RRC H", cbmap, () -> {
-        int a = reg.h();
-        boolean toCarry = ((a & 0b1) != 0);
-        a = (a >> 1) + (toCarry ? 0x80 : 0);
+        int a = rotateRightCarry(reg.h());
         reg.h(a);
-        
-        reg.zero(isZero(a));
-        reg.subtract(false);
-        reg.halfcarry(false);
-        reg.carry(toCarry);
         
         clock.m(2);
         clock.t(8);
@@ -3771,15 +3651,8 @@ public class Opcodes {
     
     //Rotate L right, old bit 0 to carry flag
     Op RRC_L = new Op(0x0D, "RRC L", cbmap, () -> {
-        int a = reg.l();
-        boolean toCarry = ((a & 0b1) != 0);
-        a = (a >> 1) + (toCarry ? 0x80 : 0);
+        int a = rotateRightCarry(reg.l());
         reg.l(a);
-        
-        reg.zero(isZero(a));
-        reg.subtract(false);
-        reg.halfcarry(false);
-        reg.carry(toCarry);
         
         clock.m(2);
         clock.t(8);
@@ -3787,15 +3660,8 @@ public class Opcodes {
     
     //Rotate memory at HL right, old bit 0 to carry flag
     Op RRC_HL = new Op(0x0E, "RRC (HL)", cbmap, () -> {
-        int a = mmu.rb(reg.hl());
-        boolean toCarry = ((a & 0b1) != 0);
-        a = (a >> 1) + (toCarry ? 0x80 : 0);
+        int a = rotateRightCarry(mmu.rb(reg.hl()));
         mmu.wb(reg.hl(), a);
-        
-        reg.zero(isZero(a));
-        reg.subtract(false);
-        reg.halfcarry(false);
-        reg.carry(toCarry);
         
         clock.m(4);
         clock.t(16);
@@ -3805,15 +3671,8 @@ public class Opcodes {
     
     //Shift A into carry, LSB is set to 0;
     Op SLA_A = new Op(0x27, "SLA A", cbmap, () -> {
-        int n = reg.a();
-        boolean carry = ((n & 0x80) != 0);
-        n = n << 1;
+        int n = this.shiftLeft(reg.a());
         reg.a(n);
-        
-        reg.zero(isZero(n));
-        reg.subtract(false);
-        reg.halfcarry(false);
-        reg.carry(carry);
         
         clock.m(2);
         clock.t(8);
@@ -3821,15 +3680,8 @@ public class Opcodes {
     
     //Shift B into carry, LSB is set to 0;
     Op SLA_B = new Op(0x20, "SLA B", cbmap, () -> {
-        int n = reg.b();
-        boolean carry = ((n & 0x80) != 0);
-        n = n << 1;
+        int n = this.shiftLeft(reg.b());
         reg.b(n);
-        
-        reg.zero(isZero(n));
-        reg.subtract(false);
-        reg.halfcarry(false);
-        reg.carry(carry);
         
         clock.m(2);
         clock.t(8);
@@ -3837,15 +3689,8 @@ public class Opcodes {
     
     //Shift C into carry, LSB is set to 0;
     Op SLA_C = new Op(0x21, "SLA C", cbmap, () -> {
-        int n = reg.c();
-        boolean carry = ((n & 0x80) != 0);
-        n = n << 1;
+        int n = this.shiftLeft(reg.c());
         reg.c(n);
-        
-        reg.zero(isZero(n));
-        reg.subtract(false);
-        reg.halfcarry(false);
-        reg.carry(carry);
         
         clock.m(2);
         clock.t(8);
@@ -3853,15 +3698,8 @@ public class Opcodes {
     
     //Shift D into carry, LSB is set to 0;
     Op SLA_D = new Op(0x22, "SLA D", cbmap, () -> {
-        int n = reg.d();
-        boolean carry = ((n & 0x80) != 0);
-        n = n << 1;
+        int n = this.shiftLeft(reg.d());
         reg.d(n);
-        
-        reg.zero(isZero(n));
-        reg.subtract(false);
-        reg.halfcarry(false);
-        reg.carry(carry);
         
         clock.m(2);
         clock.t(8);
@@ -3869,15 +3707,8 @@ public class Opcodes {
     
     //Shift E into carry, LSB is set to 0;
     Op SLA_E = new Op(0x23, "SLA E", cbmap, () -> {
-        int n = reg.e();
-        boolean carry = ((n & 0x80) != 0);
-        n = n << 1;
+        int n = this.shiftLeft(reg.e());
         reg.e(n);
-        
-        reg.zero(isZero(n));
-        reg.subtract(false);
-        reg.halfcarry(false);
-        reg.carry(carry);
         
         clock.m(2);
         clock.t(8);
@@ -3885,15 +3716,8 @@ public class Opcodes {
     
     //Shift H into carry, LSB is set to 0;
     Op SLA_H = new Op(0x24, "SLA H", cbmap, () -> {
-        int n = reg.h();
-        boolean carry = ((n & 0x80) != 0);
-        n = n << 1;
+        int n = this.shiftLeft(reg.h());
         reg.h(n);
-        
-        reg.zero(isZero(n));
-        reg.subtract(false);
-        reg.halfcarry(false);
-        reg.carry(carry);
         
         clock.m(2);
         clock.t(8);
@@ -3901,15 +3725,8 @@ public class Opcodes {
     
     //Shift L into carry, LSB is set to 0;
     Op SLA_L = new Op(0x25, "SLA L", cbmap, () -> {
-        int n = reg.l();
-        boolean carry = ((n & 0x80) != 0);
-        n = n << 1;
+        int n = this.shiftLeft(reg.l());
         reg.l(n);
-        
-        reg.zero(isZero(n));
-        reg.subtract(false);
-        reg.halfcarry(false);
-        reg.carry(carry);
         
         clock.m(2);
         clock.t(8);
@@ -3917,15 +3734,8 @@ public class Opcodes {
     
     //Shift memory at HL into carry, LSB is set to 0;
     Op SLA_HL = new Op(0x26, "SLA (HL)", cbmap, () -> {
-        int n = mmu.rb(reg.hl());
-        boolean carry = ((n & 0x80) != 0);
-        n = n << 1;
+        int n = this.shiftLeft(mmu.rb(reg.hl()));
         mmu.wb(reg.hl(), n);
-        
-        reg.zero(isZero(n));
-        reg.subtract(false);
-        reg.halfcarry(false);
-        reg.carry(carry);
         
         clock.m(4);
         clock.t(16);
@@ -3933,16 +3743,8 @@ public class Opcodes {
  
     //Shift A into carry, MSB doesnt change
     Op SRA_A = new Op(0x2F, "SRA A", cbmap, () -> {
-        int n = reg.a();
-        boolean carry = ((n & 0b1) != 0);
-        int firstbit = n & 0x80;
-        n = n >> 1;
-        reg.a(n + firstbit);
-        
-        reg.zero(isZero(n));
-        reg.subtract(false);
-        reg.halfcarry(false);
-        reg.carry(carry);
+        int n = this.shiftRightExtend(reg.a());
+        reg.a(n);
         
         clock.m(2);
         clock.t(8);
@@ -3950,16 +3752,8 @@ public class Opcodes {
     
     //Shift B into carry, MSB doesnt change
     Op SRA_B = new Op(0x28, "SRA B", cbmap, () -> {
-        int n = reg.b();
-        boolean carry = ((n & 0b1) != 0);
-        int firstbit = n & 0x80;
-        n = n >> 1;
-        reg.b(n + firstbit);
-        
-        reg.zero(isZero(n));
-        reg.subtract(false);
-        reg.halfcarry(false);
-        reg.carry(carry);
+        int n = this.shiftRightExtend(reg.b());
+        reg.b(n);
         
         clock.m(2);
         clock.t(8);
@@ -3967,16 +3761,8 @@ public class Opcodes {
     
     //Shift C into carry, MSB doesnt change
     Op SRA_C = new Op(0x29, "SRA C", cbmap, () -> {
-        int n = reg.c();
-        boolean carry = ((n & 0b1) != 0);
-        int firstbit = n & 0x80;
-        n = n >> 1;
-        reg.c(n + firstbit);
-        
-        reg.zero(isZero(n));
-        reg.subtract(false);
-        reg.halfcarry(false);
-        reg.carry(carry);
+        int n = this.shiftRightExtend(reg.c());
+        reg.c(n);
         
         clock.m(2);
         clock.t(8);
@@ -3984,16 +3770,8 @@ public class Opcodes {
     
     //Shift D into carry, MSB doesnt change
     Op SRA_D = new Op(0x2A, "SRA D", cbmap, () -> {
-        int n = reg.d();
-        boolean carry = ((n & 0b1) != 0);
-        int firstbit = n & 0x80;
-        n = n >> 1;
-        reg.d(n + firstbit);
-        
-        reg.zero(isZero(n));
-        reg.subtract(false);
-        reg.halfcarry(false);
-        reg.carry(carry);
+        int n = this.shiftRightExtend(reg.d());
+        reg.d(n);
         
         clock.m(2);
         clock.t(8);
@@ -4001,16 +3779,8 @@ public class Opcodes {
     
     //Shift E into carry, MSB doesnt change
     Op SRA_E = new Op(0x2B, "SRA E", cbmap, () -> {
-        int n = reg.e();
-        boolean carry = ((n & 0b1) != 0);
-        int firstbit = n & 0x80;
-        n = n >> 1;
-        reg.e(n + firstbit);
-        
-        reg.zero(isZero(n));
-        reg.subtract(false);
-        reg.halfcarry(false);
-        reg.carry(carry);
+        int n = this.shiftRightExtend(reg.e());
+        reg.e(n);
         
         clock.m(2);
         clock.t(8);
@@ -4018,16 +3788,8 @@ public class Opcodes {
     
     //Shift H into carry, MSB doesnt change
     Op SRA_H = new Op(0x2C, "SRA H", cbmap, () -> {
-        int n = reg.h();
-        boolean carry = ((n & 0b1) != 0);
-        int firstbit = n & 0x80;
-        n = n >> 1;
-        reg.h(n + firstbit);
-        
-        reg.zero(isZero(n));
-        reg.subtract(false);
-        reg.halfcarry(false);
-        reg.carry(carry);
+        int n = this.shiftRightExtend(reg.h());
+        reg.h(n);
         
         clock.m(2);
         clock.t(8);
@@ -4035,16 +3797,8 @@ public class Opcodes {
     
     //Shift L into carry, MSB doesnt change
     Op SRA_L = new Op(0x2D, "SRA L", cbmap, () -> {
-        int n = reg.l();
-        boolean carry = ((n & 0b1) != 0);
-        int firstbit = n & 0x80;
-        n = n >> 1;
-        reg.l(n + firstbit);
-        
-        reg.zero(isZero(n));
-        reg.subtract(false);
-        reg.halfcarry(false);
-        reg.carry(carry);
+        int n = this.shiftRightExtend(reg.l());
+        reg.l(n);
         
         clock.m(2);
         clock.t(8);
@@ -4052,16 +3806,8 @@ public class Opcodes {
     
     //Shift memory at HL into carry, MSB doesnt change
     Op SRA_HL = new Op(0x2E, "SRA (HL)", cbmap, () -> {
-        int n = mmu.rb(reg.hl());
-        boolean carry = ((n & 0b1) != 0);
-        int firstbit = n & 0x80;
-        n = n >> 1;
-        mmu.wb(reg.hl(), (n + firstbit));
-        
-        reg.zero(isZero(n));
-        reg.subtract(false);
-        reg.halfcarry(false);
-        reg.carry(carry);
+        int n = this.shiftRightExtend(mmu.rb(reg.hl()));
+        mmu.wb(reg.hl(), n);
         
         clock.m(4);
         clock.t(16);
@@ -4069,16 +3815,8 @@ public class Opcodes {
     
     //Shift A into carry, MSB 0
     Op SRL_A = new Op(0x3F, "SRL A", cbmap, () -> {
-        int n = reg.a();
-        boolean carry = ((n & 0b1) != 0);
-        int firstbit = 0x7F;
-        n = n >> 1;
-        reg.a(n & firstbit);
-        
-        reg.zero(isZero(n));
-        reg.subtract(false);
-        reg.halfcarry(false);
-        reg.carry(carry);
+        int n = this.shiftRight0(reg.a());
+        reg.a(n);
         
         clock.m(2);
         clock.t(8);
@@ -4086,16 +3824,8 @@ public class Opcodes {
     
     //Shift B into carry, MSB 0
     Op SRL_B = new Op(0x38, "SRL B", cbmap, () -> {
-        int n = reg.b();
-        boolean carry = ((n & 0b1) != 0);
-        int firstbit = 0x7F;
-        n = n >> 1;
-        reg.b(n & firstbit);
-        
-        reg.zero(isZero(n));
-        reg.subtract(false);
-        reg.halfcarry(false);
-        reg.carry(carry);
+        int n = this.shiftRight0(reg.b());
+        reg.b(n);
         
         clock.m(2);
         clock.t(8);
@@ -4103,16 +3833,8 @@ public class Opcodes {
     
     //Shift C into carry, MSB 0
     Op SRL_C = new Op(0x39, "SRL C", cbmap, () -> {
-        int n = reg.c();
-        boolean carry = ((n & 0b1) != 0);
-        int firstbit = 0x7F;
-        n = n >> 1;
-        reg.c(n & firstbit);
-        
-        reg.zero(isZero(n));
-        reg.subtract(false);
-        reg.halfcarry(false);
-        reg.carry(carry);
+        int n = this.shiftRight0(reg.c());
+        reg.c(n);
         
         clock.m(2);
         clock.t(8);
@@ -4120,16 +3842,8 @@ public class Opcodes {
     
     //Shift D into carry, MSB 0
     Op SRL_D = new Op(0x3A, "SRL D", cbmap, () -> {
-        int n = reg.d();
-        boolean carry = ((n & 0b1) != 0);
-        int firstbit = 0x7F;
-        n = n >> 1;
-        reg.d(n & firstbit);
-        
-        reg.zero(isZero(n));
-        reg.subtract(false);
-        reg.halfcarry(false);
-        reg.carry(carry);
+        int n = this.shiftRight0(reg.d());
+        reg.d(n);
         
         clock.m(2);
         clock.t(8);
@@ -4137,16 +3851,8 @@ public class Opcodes {
     
     //Shift E into carry, MSB 0
     Op SRL_E = new Op(0x3B, "SRL E", cbmap, () -> {
-        int n = reg.e();
-        boolean carry = ((n & 0b1) != 0);
-        int firstbit = 0x7F;
-        n = n >> 1;
-        reg.e(n & firstbit);
-        
-        reg.zero(isZero(n));
-        reg.subtract(false);
-        reg.halfcarry(false);
-        reg.carry(carry);
+        int n = this.shiftRight0(reg.e());
+        reg.e(n);
         
         clock.m(2);
         clock.t(8);
@@ -4154,16 +3860,8 @@ public class Opcodes {
     
     //Shift H into carry, MSB 0
     Op SRL_H = new Op(0x3C, "SRL H", cbmap, () -> {
-        int n = reg.h();
-        boolean carry = ((n & 0b1) != 0);
-        int firstbit = 0x7F;
-        n = n >> 1;
-        reg.h(n & firstbit);
-        
-        reg.zero(isZero(n));
-        reg.subtract(false);
-        reg.halfcarry(false);
-        reg.carry(carry);
+        int n = this.shiftRight0(reg.h());
+        reg.h(n);
         
         clock.m(2);
         clock.t(8);
@@ -4171,16 +3869,8 @@ public class Opcodes {
     
     //Shift L into carry, MSB 0
     Op SRL_L = new Op(0x3D, "SRL L", cbmap, () -> {
-        int n = reg.l();
-        boolean carry = ((n & 0b1) != 0);
-        int firstbit = 0x7F;
-        n = n >> 1;
-        reg.l(n & firstbit);
-        
-        reg.zero(isZero(n));
-        reg.subtract(false);
-        reg.halfcarry(false);
-        reg.carry(carry);
+        int n = this.shiftRight0(reg.l());
+        reg.l(n);
         
         clock.m(2);
         clock.t(8);
@@ -4188,16 +3878,8 @@ public class Opcodes {
     
     //Shift memory at HL into carry, MSB 0
     Op SRL_HL = new Op(0x3E, "SRL (HL)", cbmap, () -> {
-        int n = mmu.rb(reg.hl());
-        boolean carry = ((n & 0b1) != 0);
-        int firstbit = 0x7F;
-        n = n >> 1;
-        mmu.wb(reg.hl(), (n & firstbit));
-        
-        reg.zero(isZero(n));
-        reg.subtract(false);
-        reg.halfcarry(false);
-        reg.carry(carry);
+        int n = this.shiftRight0(mmu.rb(reg.hl()));
+        mmu.wb(reg.hl(), n);
         
         clock.m(4);
         clock.t(16);
@@ -4208,15 +3890,6 @@ public class Opcodes {
     ///
     
     //PAGE 108
-    
-    public void testBit(int v, int bit){
-        int mask = 1 << bit;
-        boolean set = (v & mask) != 0;
-        //Set is bit 'b' or register 'r' is 0
-        reg.zero(!set);
-        reg.subtract(false);
-        reg.halfcarry(true);
-    }
     
     //Check if bit 0 of register A is set
     Op BIT0_A = new Op(0x47, "BIT 0,A", cbmap, () -> {
@@ -4730,11 +4403,6 @@ public class Opcodes {
         clock.t(16);
     });
     
-    public int setBit(int i, int bit){
-        int mask = 1 << bit;
-        return i | mask;
-    }
-    
     //Set bit b in register r
     Op SET0_A = new Op(0xC7, "SET 0,A", cbmap, () -> {
         reg.a(setBit(reg.a(), 0));
@@ -5247,10 +4915,6 @@ public class Opcodes {
         clock.t(16);
     });
     
-    public int resetBit(int i, int bit){
-        int mask = ~(1 << bit);
-        return i & mask;
-    }
     
     //Reset the bit b in register r
     Op RES0_A = new Op(0x87, "RES 0,A", cbmap, () -> {

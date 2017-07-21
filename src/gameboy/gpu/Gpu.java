@@ -66,7 +66,6 @@ public class Gpu implements IMemory{
     private int xscroll = 0;
     private int ywindow = 0;
     private int xwindow = 0;
-    private int curscan = 0;
     private int curline = 0;
     private int lyc = 0;
     private int gpumode = 2;
@@ -116,7 +115,6 @@ public class Gpu implements IMemory{
                     }
                     
                     curline++;
-                    curscan += 640;
                     clock = 0;
                 }
                 break;
@@ -127,7 +125,6 @@ public class Gpu implements IMemory{
                     curline++;
                     if(curline > 153){
                         curline = 0;
-                        curscan = 0;
                         gpumode = Gpu.GPU_SCANLINEOAM;
                     }
                 }
@@ -325,7 +322,6 @@ public class Gpu implements IMemory{
         //Internal values
         yscroll = 0;
         xscroll = 0;
-        curscan = 0;
         curline = 0;
         lyc = 0;
         gpumode = 2;
