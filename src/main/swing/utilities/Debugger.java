@@ -3,7 +3,7 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package utilities;
+package main.swing.utilities;
 
 import gameboy.cpu.Cpu;
 import gameboy.Gameboy;
@@ -22,9 +22,10 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import javax.swing.ButtonGroup;
-import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
+import javax.swing.JMenu;
+import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
@@ -38,6 +39,8 @@ import javax.swing.JViewport;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.TableModel;
+import main.swing.Action;
+import main.swing.SwingGB;
 
 /**
  *
@@ -72,6 +75,7 @@ public class Debugger extends JFrame{
     
     private Table<String> memoryTable = new Table<String>(2);
     private Table<String> registryTable = new Table<String>(4);
+    private SwingGB swinggb;
     private MemoryMap mmu;
     private Registry reg;
     private Cpu cpu;
@@ -84,8 +88,28 @@ public class Debugger extends JFrame{
     
     private ArrayList<Integer> breakpoints = new ArrayList<Integer>();
     
-    public Debugger(Gameboy gb){
+    Action breakpointStep = new Action(){
+        @Override
+        public void Invoke(){
+            if(breakpoints.contains(reg.pc())){
+                swinggb.Off(breakpointStep);
+                swinggb.Pause();
+                jumpToRow(reg.pc());
+                Refresh();
+            }
+        }
+    };
+    
+    Action singleStep = () -> {
+        swinggb.Pause();
+        jumpToRow(reg.pc());
+        Refresh();
+    };
+    
+    public Debugger(SwingGB swinggb){
         this.setLayout(new BorderLayout());
+        this.swinggb = swinggb;
+        Gameboy gb = swinggb.GetGameboy();
         this.mmu = gb.mmu;
         this.reg = gb.cpu.reg;
         this.cpu = gb.cpu;
@@ -240,7 +264,6 @@ public class Debugger extends JFrame{
         
         this.add(new JScrollPane(right), BorderLayout.EAST);
         
-        JPanel panelheader = new JPanel();
         JPanel footer = new JPanel();
         
         ButtonGroup group = new ButtonGroup();
@@ -261,46 +284,75 @@ public class Debugger extends JFrame{
         displayMode.add(hex);
         displayMode.add(opc);
         
-        JButton button = new JButton("Refresh");
-        button.addActionListener((evt) -> {
+        //Create the top menu
+        JMenuBar menu = new JMenuBar();
+        
+        //Flow control
+        JMenu flow = new JMenu("Execution");
+        menu.add(flow);
+        
+        JMenuItem flow_pause = new JMenuItem("Pause");
+        flow_pause.addActionListener((evt) -> {
+            swinggb.Pause();
+        });
+        flow.add(flow_pause);
+        
+        JMenuItem flow_play = new JMenuItem("Play");
+        flow_play.addActionListener((evt) -> {
+            swinggb.Play();
+        });
+        flow.add(flow_play);
+        
+        JMenuItem flow_step = new JMenuItem("Single Step");
+        flow_step.addActionListener((evt) -> {
+            swinggb.Pause();
+            swinggb.Once(singleStep);
+            swinggb.Play();
+        });
+        flow.add(flow_step);
+        
+        JMenuItem flow_stepbreak = new JMenuItem("Breakpoint Step");
+        flow_stepbreak.addActionListener((evt) -> {
+            swinggb.Pause();
+            swinggb.On(breakpointStep);
+            swinggb.Play();
+        });
+        flow.add(flow_stepbreak);
+        
+        //Display
+        JMenu display = new JMenu("Display");
+        menu.add(display);
+        
+        JMenuItem display_refresh = new JMenuItem("Refresh");
+        display_refresh.addActionListener((evt) -> {
             Refresh();
         });
+        display.add(display_refresh);
         
-        JButton button2 = new JButton("Step");
-        button2.addActionListener((evt) -> {
-            gb.Dispatch();
-            Refresh();
+        JMenuItem display_gotopc = new JMenuItem("Goto PC");
+        display_gotopc.addActionListener((evt) -> {
             jumpToRow(reg.pc());
-            table.setRowSelectionInterval(reg.pc(), reg.pc());
         });
+        display.add(display_gotopc);
         
-        JButton button6 = new JButton("Breakpoint Step");
-        button6.addActionListener((evt) -> {
-            //Run action in a whole new thread
-            Thread t = new Thread(){
-                @Override
-                public void run(){
-                    try{
-                        while(true){
-                            gb.Dispatch();
-                            if(breakpoints.contains(reg.pc()))
-                                break;
-                            //Thread.sleep(1);
-                        }
-                        Refresh();
-                        jumpToRow(reg.pc());
-                        table.setRowSelectionInterval(reg.pc(), reg.pc());
-                    }catch(Exception e){
-                        JOptionPane.showMessageDialog(null, e);
-                        e.printStackTrace();
-                    }
-                }
-            };
-            t.start();
+        JMenuItem display_gotoa = new JMenuItem("Goto Address");
+        display_gotoa.addActionListener((evt) -> {
+            String r = JOptionPane.showInputDialog(null, "Select address to scroll to");
+            try{
+                int i = Integer.parseInt(r, 16);
+                jumpToRow(i);
+            }catch(Exception e){
+                JOptionPane.showMessageDialog(null, "Bad address format");
+            }
         });
+        display.add(display_gotoa);
         
-        JButton button3 = new JButton("Inject");
-        button3.addActionListener((evt) -> {
+        //Modify features
+        JMenu mod = new JMenu("Modify");
+        menu.add(mod);
+        
+        JMenuItem mod_inject = new JMenuItem("Inject Value");
+        mod_inject.addActionListener((evt) -> {
             JTextField loc = new JTextField();
             loc.setPreferredSize(new Dimension(120, 32));
             JTextField value = new JTextField();
@@ -354,48 +406,35 @@ public class Debugger extends JFrame{
                }
             }
         });
+        mod.add(mod_inject);
         
-        JButton button4 = new JButton("Run Op");
-        button4.addActionListener((evt) -> {
-            String r = JOptionPane.showInputDialog(null, "Select Opcode To Run");
-            try{
-                int i = Integer.parseInt(r);
-                gb.cpu.opcodes.Fetch(i).Invoke();
-                Refresh();
-            }catch(Exception e){
-                JOptionPane.showMessageDialog(null, "Failed to execute opcode");
-            }
+        //Extra dubugger windows
+        JMenu windows = new JMenu("Windows");
+        menu.add(windows);
+        
+        JMenuItem show_tileviewer = new JMenuItem("Tile Viewer");
+        show_tileviewer.addActionListener((evt) -> {
+            TileViewer viewer = new TileViewer(gb);
+            viewer.setVisible(true);
         });
+        windows.add(show_tileviewer);
         
-        JButton button5 = new JButton("Goto");
-        button5.addActionListener((evt) -> {
-            String r = JOptionPane.showInputDialog(null, "Select address to scroll to");
-            try{
-                int i = Integer.parseInt(r, 16);
-                jumpToRow(i);
-            }catch(Exception e){
-                JOptionPane.showMessageDialog(null, "Bad address format");
-            }
+        JMenuItem show_spriteviewer = new JMenuItem("Sprite Viewer");
+        show_spriteviewer.addActionListener((evt) -> {
+            SpriteViewer viewer = new SpriteViewer(gb);
+            viewer.setVisible(true);
         });
+        windows.add(show_spriteviewer);
         
-        JButton button7 = new JButton("Goto PC");
-        button7.addActionListener((evt) -> {
-            jumpToRow(reg.pc());
-        });
-         
-        panelheader.add(displayMode);
-        footer.add(button);
-        footer.add(button7);
-        footer.add(button5);
-        footer.add(button2);
-        footer.add(button6);
-        footer.add(button3);
-        footer.add(button4);
-        
+        //Finish config
+        footer.add(displayMode);
         this.add(footer, BorderLayout.SOUTH);
-        this.add(panelheader, BorderLayout.NORTH);
+        
+        this.setJMenuBar(menu);
         
         this.setTitle("Debugger");
+        this.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+        this.setSize(640, 480);
     }
     
     public void jumpToRow(int i){

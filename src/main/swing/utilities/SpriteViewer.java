@@ -3,7 +3,7 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package utilities;
+package main.swing.utilities;
 
 import gameboy.Gameboy;
 import gameboy.gpu.Bitmap;
@@ -132,6 +132,8 @@ public class SpriteViewer extends JFrame{
             Refresh();
         });
         this.add(refresh, BorderLayout.SOUTH);
+        
+        this.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
     }
     
     public void Refresh(){

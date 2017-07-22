@@ -3,7 +3,7 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package utilities;
+package main.swing.utilities;
 
 import gameboy.Gameboy;
 import gameboy.gpu.Bitmap;
@@ -150,6 +150,8 @@ public class TileViewer extends JFrame{
         
         this.add(leftPanel, BorderLayout.WEST);
         this.add(rightPanel, BorderLayout.CENTER);
+        
+        this.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
     }
     
     public void Refresh(){

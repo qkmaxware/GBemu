@@ -6,6 +6,7 @@
 package main;
 
 import java.awt.Dimension;
+import main.swing.SwingLauncher;
 
 /**
  *
@@ -15,8 +16,7 @@ public class Launcher {
     
     public static void main(String[] args){
         
-        DebugableSwingGB window = new DebugableSwingGB();
-        window.gb.Reset();
+        SwingLauncher window = new SwingLauncher();
         window.setSize(new Dimension(300,360));
         window.setVisible(true);
         

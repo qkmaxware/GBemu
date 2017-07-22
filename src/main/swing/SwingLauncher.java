@@ -3,55 +3,35 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package main;
+package main.swing;
 
 import gameboy.game.Cartridge;
 import gameboy.game.CartridgeFactory;
-import gameboy.Gameboy;
-import gameboy.gpu.Gpu;
 import java.awt.Color;
 import java.awt.Dimension;
-import java.awt.Graphics;
-import java.awt.Graphics2D;
-import java.awt.RenderingHints;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.FilenameFilter;
 import javax.swing.BoxLayout;
 import javax.swing.DefaultListCellRenderer;
 import javax.swing.JFrame;
 import javax.swing.JList;
-import javax.swing.JMenu;
-import javax.swing.JMenuBar;
-import javax.swing.JMenuItem;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.ListSelectionModel;
 import javax.swing.SwingConstants;
-import utilities.Debugger;
-import utilities.SpriteViewer;
-import utilities.TileViewer;
+import main.swing.utilities.Debugger;
 
 /**
  *
  * @author Colin Halseth
  */
-public class DebugableSwingGB extends JFrame{
+public class SwingLauncher extends JFrame{
     
-    public final Gameboy gb;
-    private Debugger debugger;
-    private SpriteViewer spriteViewer;
+    private String romLocation = "./roms/";
     
-    public DebugableSwingGB(){
-        //Assign code
-        this.gb = new Gameboy();
-        debugger = new Debugger(this.gb);
-        debugger.setSize(640, 480);
-        spriteViewer = new SpriteViewer(this.gb);
-        TileViewer tileViewer = new TileViewer(this.gb);
-        
+    public SwingLauncher(){
         //Buid swing components
         this.setTitle("Gameboy Emulator");
         this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -65,9 +45,6 @@ public class DebugableSwingGB extends JFrame{
         contentPane.add(header);
         
         Cartridge[] carts = GetLocalCartridges();
-        for(Cartridge cart : carts){
-            
-        }
         
         JList body = new JList(carts);
         body.setSelectionMode(ListSelectionModel.SINGLE_INTERVAL_SELECTION);
@@ -77,52 +54,26 @@ public class DebugableSwingGB extends JFrame{
         ((DefaultListCellRenderer)(body.getCellRenderer())).setHorizontalAlignment(SwingConstants.CENTER);
         ((DefaultListCellRenderer)(body.getCellRenderer())).setForeground(Color.WHITE);
         
-        //Renderer
-        JFrame renderer = new JFrame(){};
-        renderer.setSize(Gpu.LCD_WIDTH, Gpu.LCD_HEIGHT);
-        RenderPanel renderContainer = new RenderPanel(this.gb.gpu.canvas);
-        renderer.add(renderContainer);
-        this.gb.OnBufferReady(() -> {
-            renderContainer.repaint();
-        });
-        JMenuBar menu = new JMenuBar();
-        renderer.setJMenuBar(menu);
-
-        JMenu deb = new JMenu("Debugging");
-        menu.add(deb);
-        JMenuItem mem = new JMenuItem("Memory");
-        mem.addActionListener((evt) -> {
-            debugger.setVisible(true);
-        });
-        JMenuItem spr = new JMenuItem("Sprites");
-        spr.addActionListener((evt) -> {
-            spriteViewer.setVisible(true);
-        });
-        JMenuItem tyl = new JMenuItem("Tiles");
-        tyl.addActionListener((evt) -> {
-            tileViewer.setVisible(true);
-        });
-        deb.add(mem);
-        deb.add(spr);
-        deb.add(tyl);
-        
+        body.setBackground(Color.BLACK);
         body.addMouseListener(new MouseAdapter(){
             @Override
             public void mouseClicked(MouseEvent evt) {
                 JList list = (JList)evt.getSource();
                 switch(evt.getClickCount()){
                     case 2:
-                        gb.Reset();
                         Cartridge cart = carts[list.locationToIndex(evt.getPoint())];
-                        gb.LoadCartridge(cart);
-                        renderer.setTitle("Playing: "+cart.toString());
-                        renderer.setVisible(true);
+                                
+                        SwingGB gb = new SwingGB(false);
+                        gb.GetGameboy().LoadCartridge(cart);
+                        gb.setTitle("Playing: "+cart.toString());
+                        gb.setVisible(true);
+                        
+                        Debugger debugger = new Debugger(gb);
+                        debugger.setVisible(true);
                         break;
                 }
             }
         });
-        
-        body.setBackground(Color.BLACK);
         
         JScrollPane scroller = new JScrollPane(body){
             public Dimension getPreferredSize(){
@@ -135,16 +86,8 @@ public class DebugableSwingGB extends JFrame{
         this.add(contentPane);
     }
     
-    public Debugger getDebugger(){
-        return debugger;
-    }
-    
-    public SpriteViewer getSpriteViewer(){
-        return spriteViewer;
-    }
-    
-    public static Cartridge[] GetLocalCartridges(){
-        File dir = new File("./roms/");
+    public Cartridge[] GetLocalCartridges(){
+        File dir = new File(this.romLocation);
         File[] files = dir.listFiles(new FilenameFilter() {
             @Override
             public boolean accept(File dir, String name) {
