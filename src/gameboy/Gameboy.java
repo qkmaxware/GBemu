@@ -68,6 +68,7 @@ public class Gameboy {
     
     public void LoadCartridge(Cartridge cart){
         adapter.LoadCart(cart);
+        Reset();
     }
     
     public void OnBufferReady(Listener listener){

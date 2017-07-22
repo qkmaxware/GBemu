@@ -23,13 +23,28 @@ public class CartridgeAdapter implements IMemory{
     private int ramoff = 0;
     
     private Cartridge cart;
+    private MBC controller;
     
     public void LoadCart(Cartridge cart){
         this.cart = cart;
+        
+        switch(cart.info.cartType){
+            case MBC1:
+                controller = (MBC) new MBC1();
+                break;
+            default:
+                controller = null;
+        }
     }
     
     private static boolean in(int x, int lower, int upper) {
         return lower <= x && x <= upper;
+    }
+    
+    public boolean supportsCGB(){
+        if(cart == null)
+            return false;
+        return cart.supportsCGB();
     }
     
     @Override
@@ -64,6 +79,9 @@ public class CartridgeAdapter implements IMemory{
     @Override
     public void wb(int addr, int value) {
         //TODO write byte to cause MBC changes
+        if(controller != null)
+            controller.hasOccurredWrite(this, addr, value);
+        
         if(in(addr, 0xA000, 0xBFFF)){
             //External cartridge RAM
             eram[ramoff + (addr&0x1FFF)] = value; //eram[ramoffs+(addr&0x1FFF)];

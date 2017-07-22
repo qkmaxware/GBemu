@@ -6,6 +6,7 @@
 package gameboy.cpu;
 
 import gameboy.MemoryMap;
+import gameboy.game.CartridgeAdapter;
 import java.util.concurrent.ConcurrentLinkedDeque;
 
 /**
@@ -43,11 +44,11 @@ public class Cpu {
         recentOps.clear();
         
         //Initial values expected by the bios
-        reg.a(0x01);
-        reg.f(0xB0);
+        reg.af((mmu.Get(MemoryMap.ROM_BANK_0) != null && ((CartridgeAdapter)mmu.Get(MemoryMap.ROM_BANK_0)).supportsCGB()) ? 0x11B0 : 0x01B0);
         reg.bc(0x0013);
         reg.de(0x00D8);
         reg.hl(0x014D);
+        
         reg.sp(0xFFFE);
         reg.pc(0x0100);
         

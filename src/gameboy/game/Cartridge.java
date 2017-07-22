@@ -22,6 +22,14 @@ public class Cartridge{
         this.rom = rom;
     }
     
+    public boolean supportsSGB(){
+        return info.sgb == RomInfo.SgbSupport.SGB;
+    }
+    
+    public boolean supportsCGB(){
+        return (info.cgb == RomInfo.CgbSupport.CbgAllowed || info.cgb == RomInfo.CgbSupport.CbgRequired);
+    }
+    
     public String toString(){
         return (source == null ? info.title : source.getName());
     }

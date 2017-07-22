@@ -30,6 +30,7 @@ import main.swing.utilities.Debugger;
 public class SwingLauncher extends JFrame{
     
     private String romLocation = "./roms/";
+    private boolean enableDebugger = true;
     
     public SwingLauncher(){
         //Buid swing components
@@ -63,13 +64,17 @@ public class SwingLauncher extends JFrame{
                     case 2:
                         Cartridge cart = carts[list.locationToIndex(evt.getPoint())];
                                 
-                        SwingGB gb = new SwingGB(false);
+                        SwingGB gb = new SwingGB(!enableDebugger);
                         gb.GetGameboy().LoadCartridge(cart);
-                        gb.setTitle("Playing: "+cart.toString());
+                        gb.setTitle("Playing: "+cart.info.title);
                         gb.setVisible(true);
                         
-                        Debugger debugger = new Debugger(gb);
-                        debugger.setVisible(true);
+                        if(enableDebugger){
+                            Debugger debugger = new Debugger(gb);
+                            debugger.setVisible(true);
+                        }
+                        
+                        System.out.println(cart.info.toString());
                         break;
                 }
             }

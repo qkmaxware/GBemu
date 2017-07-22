@@ -185,22 +185,20 @@ public class Tests {
         }
         
         //Test flags
-        boolean flag;
-        
         cpu.reg.carry(true);
-        if(cpu.reg.carry() != true)
+        if(cpu.reg.carry() != true || (cpu.reg.f() & 0b00010000) != 0b00010000)
             System.out.println("Failure to set c");
         
         cpu.reg.halfcarry(true);
-        if(cpu.reg.halfcarry() != true)
+        if(cpu.reg.halfcarry() != true || (cpu.reg.f() & 0b00100000) != 0b00100000)
             System.out.println("Failure to set h");
         
         cpu.reg.zero(true);
-        if(cpu.reg.zero() != true)
+        if(cpu.reg.zero() != true || (cpu.reg.f() & 0b10000000) != 0b10000000)
             System.out.println("Failure to set z");
         
         cpu.reg.subtract(true);
-        if(cpu.reg.subtract() != true)
+        if(cpu.reg.subtract() != true || (cpu.reg.f() & 0b01000000) != 0b01000000)
             System.out.println("Failure to set n");
         
         cpu.reg.carry(false);

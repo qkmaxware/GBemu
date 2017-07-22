@@ -6,7 +6,7 @@
 package gameboy.game;
 
 /**
- *
+ * 
  * @author Colin
  */
 public class RomInfo {

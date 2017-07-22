@@ -18,6 +18,8 @@ import java.awt.Font;
 import java.awt.GridLayout;
 import java.awt.Point;
 import java.awt.Rectangle;
+import java.awt.Toolkit;
+import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
@@ -36,6 +38,7 @@ import javax.swing.JTable;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.JViewport;
+import javax.swing.KeyStroke;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.TableModel;
@@ -291,17 +294,19 @@ public class Debugger extends JFrame{
         JMenu flow = new JMenu("Execution");
         menu.add(flow);
         
-        JMenuItem flow_pause = new JMenuItem("Pause");
-        flow_pause.addActionListener((evt) -> {
-            swinggb.Pause();
-        });
-        flow.add(flow_pause);
-        
         JMenuItem flow_play = new JMenuItem("Play");
         flow_play.addActionListener((evt) -> {
             swinggb.Play();
         });
         flow.add(flow_play);
+        setShortcut(flow_play, KeyEvent.VK_F1);
+        
+        JMenuItem flow_pause = new JMenuItem("Pause");
+        flow_pause.addActionListener((evt) -> {
+            swinggb.Pause();
+        });
+        flow.add(flow_pause);
+        setShortcut(flow_pause, KeyEvent.VK_F2);
         
         JMenuItem flow_step = new JMenuItem("Single Step");
         flow_step.addActionListener((evt) -> {
@@ -310,6 +315,7 @@ public class Debugger extends JFrame{
             swinggb.Play();
         });
         flow.add(flow_step);
+        setShortcut(flow_step, KeyEvent.VK_F3);
         
         JMenuItem flow_stepbreak = new JMenuItem("Breakpoint Step");
         flow_stepbreak.addActionListener((evt) -> {
@@ -318,6 +324,13 @@ public class Debugger extends JFrame{
             swinggb.Play();
         });
         flow.add(flow_stepbreak);
+        setShortcut(flow_stepbreak, KeyEvent.VK_F4);
+        
+        JMenuItem flow_reset= new JMenuItem("Reset");
+        flow_reset.addActionListener((evt) -> {
+            swinggb.GetGameboy().Reset();
+        });
+        flow.add(flow_reset);
         
         //Display
         JMenu display = new JMenu("Display");
@@ -328,12 +341,14 @@ public class Debugger extends JFrame{
             Refresh();
         });
         display.add(display_refresh);
+        setShortcut(display_refresh, KeyEvent.VK_F5);
         
         JMenuItem display_gotopc = new JMenuItem("Goto PC");
         display_gotopc.addActionListener((evt) -> {
             jumpToRow(reg.pc());
         });
         display.add(display_gotopc);
+        setShortcut(display_gotopc, KeyEvent.VK_F6);
         
         JMenuItem display_gotoa = new JMenuItem("Goto Address");
         display_gotoa.addActionListener((evt) -> {
@@ -346,6 +361,7 @@ public class Debugger extends JFrame{
             }
         });
         display.add(display_gotoa);
+        setShortcut(display_gotoa, KeyEvent.VK_F7);
         
         //Modify features
         JMenu mod = new JMenu("Modify");
@@ -407,6 +423,7 @@ public class Debugger extends JFrame{
             }
         });
         mod.add(mod_inject);
+        setShortcut(mod_inject, KeyEvent.VK_9);
         
         //Extra dubugger windows
         JMenu windows = new JMenu("Windows");
@@ -445,18 +462,20 @@ public class Debugger extends JFrame{
         table.setRowSelectionInterval(i, i);
     }
     
+    private void setShortcut(JMenuItem item, int key){
+        KeyStroke sc = KeyStroke.getKeyStroke(key, Toolkit.getDefaultToolkit().getMenuShortcutKeyMask());
+        item.setAccelerator(sc);
+    }
+    
     public void Refresh(){
         int startId = table.getSelectionModel().getMinSelectionIndex();
         int endId = table.getSelectionModel().getMaxSelectionIndex();
         
+        while(memoryTable.Rows() <= mmu.MaxAddress())
+            memoryTable.AddRow();
+        
         for(int i = 0; i <= mmu.MaxAddress(); i++){
-            ArrayList<String> row;
-            if(i >= memoryTable.Rows()){
-                row = memoryTable.AddRow();
-            }else{
-                row = memoryTable.GetRow(i);
-            }
-            
+            ArrayList<String>  row = memoryTable.GetRow(i);
             
             row.set(0, String.format("%04X", i));
             switch(displayMode){
@@ -468,23 +487,50 @@ public class Debugger extends JFrame{
                     break;
                 case 2:
                     Op op = this.cpu.opcodes.Fetch(mmu.rb(i));
-                    //For multi-byte opcodes
-                    int n = 0; int nn = 0;
-                    if(i <= mmu.MaxAddress() - 1)
-                        n = mmu.rb(i+1);
-                    if(i <= mmu.MaxAddress() - 2)
-                        nn = (mmu.rb(i+2) << 8) | mmu.rb(i+1);
-                    
-                    String str;
-                    if(op != null){
-                        str = op.toString();
-                        str = str.replace("nn", String.format("%X", nn));
-                        str = str.replace("n", String.format("%X", n));
-                    }else{
-                        str = ""+mmu.rb(i);
+                    if(op == null){
+                        row.set(1, ""+mmu.rb(i));
+                        break;
                     }
                     
-                    row.set(1, str);
+                    String str = op.toString();
+                    int n = 0; int nn = 0;
+                    if(str.contains("nn")){
+                        if(i <= mmu.MaxAddress() - 2)
+                            nn = (mmu.rb(i+2) << 8) | mmu.rb(i+1);
+                        int d = 0;
+                        str = str.replace("nn", String.format("%X", nn));
+                        
+                        if(i + 1 < mmu.MaxAddress()){
+                            memoryTable.GetRow(i+1).set(0,"");
+                            memoryTable.GetRow(i+1).set(1,"--");
+                            d++;
+                        }
+                        if(i + 2 < mmu.MaxAddress()){
+                            memoryTable.GetRow(i+2).set(0,"");
+                            memoryTable.GetRow(i+2).set(1,"--");
+                            d++;
+                        }
+                        
+                        i += d;
+                        row.set(1, str);
+                    }else if(str.contains("n")){
+                        if(i <= mmu.MaxAddress())
+                            n = mmu.rb(i+1);
+                        int d = 0;
+                        str = str.replace("n", String.format("%X", n));
+                        
+                        if(i + 1 < mmu.MaxAddress()){
+                            memoryTable.GetRow(i+1).set(0,"");
+                            memoryTable.GetRow(i+1).set(1,"--");
+                            d++;
+                        }
+                        
+                        i += d;
+                        row.set(1, str);
+                    }else{
+                        row.set(1, str);
+                    }
+                    
                     break;
             }            
         }
@@ -506,7 +552,12 @@ public class Debugger extends JFrame{
         registryTable.GetRow(1).set(1, String.format(smallformat,reg.a()));
         
         registryTable.GetRow(1).set(2, "F (flags)");
-        registryTable.GetRow(1).set(3, String.format(smallformat,reg.f()));
+        registryTable.GetRow(1).set(3, String.format(smallformat,reg.f()) + " - " + 
+                    (reg.zero() ? "Z": "") +
+                    (reg.subtract() ? "N": "") +
+                    (reg.halfcarry() ? "H": "") +
+                    (reg.carry() ? "C": "")
+                );
         
         registryTable.GetRow(2).set(0, "B");
         registryTable.GetRow(2).set(1, String.format(smallformat,reg.b()));
@@ -554,7 +605,7 @@ public class Debugger extends JFrame{
         ((AbstractTableModel)registryModel).fireTableDataChanged();
         
         logger.setText(String.join("\n", cpu.recentOps));
-        this.logScroll.getVerticalScrollBar().setValue(1); //Stay at the top
+        this.logScroll.getVerticalScrollBar().setValue(0); //Stay at the top
         
         this.repaint();
         

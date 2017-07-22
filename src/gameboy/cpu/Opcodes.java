@@ -14,8 +14,6 @@ import java.util.ArrayList;
  * @author Colin
  */
 public class Opcodes {
- 
-    //https://github.com/tomdalling/gemuboi/blob/master/source/cpu.hpp
     
     private Registry reg;
     private Registry cpp;
@@ -262,6 +260,18 @@ public class Opcodes {
         return shift;
     }
     
+    public int signedByteToUnsigned(int s8){
+        if(s8 < 0)
+            s8 = 256 + s8;
+        return s8;
+    }
+    
+    public int unsignedByteToSigned(int u8){
+        if(u8 > 127)
+            u8 = -((~u8+1)&255);
+        return u8;
+    }
+    
     //--------------------------------------------------------------------------
     // List of all OPCODES
     //--------------------------------------------------------------------------
@@ -329,8 +339,6 @@ public class Opcodes {
         clock.m(2);
         clock.t(8);
     });
-    
-    //TODO LD nn,n for BC, DE, HL, SP
     
     //Load into register A from register A
     Op LD_rr_aa = new Op(0x7F, "LD A,A", map, () -> {
@@ -701,7 +709,7 @@ public class Opcodes {
     });
     
     //Load into register L from register E
-    Op LD_rr_lr = new Op(0x6B, "LD L,E", map, () -> {
+    Op LD_rr_le = new Op(0x6B, "LD L,E", map, () -> {
         int v = reg.e();
         reg.l(v);
         clock.m(1);
@@ -709,7 +717,7 @@ public class Opcodes {
     });
     
     //Load into register L from register H
-    Op LD_rr_lH = new Op(0x6C, "LD L,H", map, () -> {
+    Op LD_rr_lh = new Op(0x6C, "LD L,H", map, () -> {
         int v = reg.h();
         reg.l(v);
         clock.m(1);
@@ -777,8 +785,9 @@ public class Opcodes {
     //Load into memory HL from immediate value n
     Op LD_rr_hln = new Op(0x36, "LD (HL),n", map, () -> {
         mmu.wb(reg.hl(), mmu.rb(reg.pc()));
-        clock.m(2);
-        clock.t(8);
+        reg.pcpp(1);
+        clock.m(3);
+        clock.t(12);
     });
     
     //Load into register A from memory BC
@@ -806,8 +815,8 @@ public class Opcodes {
         clock.t(16);
     });
     
-    //Load into register A from memory n
-    Op LD_an = new Op(0x3E, "LD A,(n)", map, () -> {
+    //Load into register A from immediate n
+    Op LD_an = new Op(0x3E, "LD A,n", map, () -> {
         int v = mmu.rb( reg.pc() );
         reg.a(v);
         reg.pcpp(1);
@@ -879,7 +888,7 @@ public class Opcodes {
     
     //Load into memory HL the value in register A
     Op LD_hla = new Op(0x77, "LD (HL),A", map, () -> {
-        mmu.wb(reg.bc(), reg.a());
+        mmu.wb(reg.hl(), reg.a());
         clock.m(2);
         clock.t(8);
     });
@@ -895,7 +904,7 @@ public class Opcodes {
     //PAGE 70
     
     //Load into register A the value in 0xFF00 + register C
-    Op LD_A_c = new Op(0xF2, "LD A,(C)", map, () -> {
+    Op LD_A_c = new Op(0xF2, "LD A,(FF00 + C)", map, () -> {
         int v = mmu.rb(0xFF00 + reg.c());
         reg.a(v);
         clock.m(2);
@@ -903,7 +912,7 @@ public class Opcodes {
     });
     
     //Load into memory 0xFF00 + register C the value in register A
-    Op LD_c_A = new Op(0xE2, "LD (C),A", map, () -> {
+    Op LD_c_A = new Op(0xE2, "LD (FF00 + C),A", map, () -> {
         mmu.wb(0xFF00 + reg.c(), reg.a());
         clock.m(2);
         clock.t(8);
@@ -1015,9 +1024,7 @@ public class Opcodes {
     //Put SP + n into HL, (n is a 8bit signed value)
     //Flags Z-Reset, N-Reset, H-Set or Reset, C-Set or Reset
     Op LDHL_SP_n = new Op(0xF8, "LDHL SP,n", map, () -> {
-        int n =  mmu.rb(reg.pc());
-        if(n > 127) //Signed stranformation
-            n = -((~n+1)&255);
+        int n =  unsignedByteToSigned(mmu.rb(reg.pc()));
         int sp = reg.sp();
         reg.hl(sp + n);
         reg.pcpp(1);
@@ -1033,7 +1040,7 @@ public class Opcodes {
     //Put stack pointer into memory at nn //TODO
     Op LD_nn_SP = new Op(0x08, "LD (nn),SP", map, () -> {
         int v = reg.sp();
-        mmu.ww(v, mmu.rw(reg.pc()));
+        mmu.ww(mmu.rw(reg.pc()), v);
         reg.pcpp(2);
         clock.m(5);
         clock.t(20);
@@ -2558,9 +2565,7 @@ public class Opcodes {
     
     //Add to register SP the signed immediate value n
     Op ADD_SP_n = new Op(0xE8, "ADD SP,n", map, () -> {
-        int n = mmu.rb(reg.pc());
-        if(n > 127)
-            n = -((~n+1)&255);
+        int n = unsignedByteToSigned(mmu.rb(reg.pc()));
         int sp = reg.sp();
         int v = sp + n;
         reg.sp(v);
@@ -2776,23 +2781,26 @@ public class Opcodes {
         int a = reg.a();
         
         if(!reg.subtract()){
-            if(reg.halfcarry() || (a & 0xF) > 9)
-                a += 0x06;
+            if(reg.halfcarry() || (a & 0x0F) > 9)
+                a += 6;
             
             if(reg.carry() || a > 0x9F)
                 a += 0x60;
         }else{
-            if(reg.halfcarry())
-                a = (a - 0x6) & 0xFF;
+            if(reg.halfcarry()){
+                a -= 6;
+                if(!reg.carry())
+                    a &= 0xFF;
+            }
             
             if(reg.carry())
-                a = (a - 0x60) & 0xFF;
+                a -= 0x60;
         }
         
         reg.a(a);
         
         reg.zero(isZero(a));
-        reg.carry((a & 0x100) == 0x100);
+        reg.carry((a & 0x100) != 0);
         reg.halfcarry(false);
         
         clock.m(1);
@@ -2991,7 +2999,7 @@ public class Opcodes {
     });
     
     //Jump to address in HL
-    Op JP_NL = new Op(0xE9, "JP HL", map, () -> {
+    Op JP_HL = new Op(0xE9, "JP (HL)", map, () -> {
         reg.pc(reg.hl());
         
         clock.m(1);
@@ -3000,10 +3008,8 @@ public class Opcodes {
     
     //Add signed value n to the current address and jump to it
     Op JP_n = new Op(0x18, "JR n", map, () -> {
-        int n = mmu.rb(reg.pc());
+        int n = unsignedByteToSigned(mmu.rb(reg.pc()));
         reg.pcpp(1);
-        if(n > 127)
-            n = -((~n+1)&255);
         int a = reg.pc() + n;
         reg.pc(a);
         
@@ -3013,9 +3019,7 @@ public class Opcodes {
     
     //Jump to pc + signed n if Z flag is reset
     Op JP_NZ_n = new Op(0x20, "JR NZ,n", map, () -> {
-        int i = mmu.rb(reg.pc());
-        if(i > 127)
-            i = -((~i+1)&255);
+        int i = unsignedByteToSigned(mmu.rb(reg.pc()));
         reg.pcpp(1);
         
         if(!reg.zero()){
@@ -3030,9 +3034,7 @@ public class Opcodes {
     
     //Jump to pc + signed n if Z flag is set
     Op JP_Z_n = new Op(0x28, "JR Z,n", map, () -> {
-        int i = mmu.rb(reg.pc());
-        if(i > 127)
-            i = -((~i+1)&255);
+        int i = unsignedByteToSigned(mmu.rb(reg.pc()));
         reg.pcpp(1);
         
         if(reg.zero()){
@@ -3047,9 +3049,7 @@ public class Opcodes {
     
     //Jump to pc + signed n if C flag is reset
     Op JP_NC_n = new Op(0x30, "JR NC,n", map, () -> {
-        int i = mmu.rb(reg.pc());
-        if(i > 127)
-            i = -((~i+1)&255);
+        int i = unsignedByteToSigned(mmu.rb(reg.pc()));
         reg.pcpp(1);
         
         if(!reg.carry()){
@@ -3064,9 +3064,7 @@ public class Opcodes {
     
     //Jump to pc + signed n if C flag is set
     Op JP_C_n = new Op(0x38, "JR C,n", map, () -> {
-        int i = mmu.rb(reg.pc());
-        if(i > 127)
-            i = -((~i+1)&255);
+        int i = unsignedByteToSigned(mmu.rb(reg.pc()));
         reg.pcpp(1);
         
         if(reg.carry()){
@@ -3103,7 +3101,7 @@ public class Opcodes {
     //Call address n if the condtion is true
     Op CALL_NZ_nn = new Op(0xC4, "CALL NZ,nn", map, () -> {
         if(!reg.zero()){
-             //Next inst to stack
+            //Next inst to stack
             reg.sppp(-2);
             int next = reg.pc() + 2;
             mmu.ww(reg.sp(), next);
@@ -3197,7 +3195,7 @@ public class Opcodes {
     private void rst(int loc){
         rsv(); //TODO //Save registry to backup
         reg.sppp(-2);
-        mmu.wb(reg.sp(), reg.pc());
+        mmu.ww(reg.sp(), reg.pc());
         reg.pc(loc);
         
         clock.m(3); //Maybe 8 and 32 or 4 or something
@@ -3359,9 +3357,7 @@ public class Opcodes {
     });
     
     Op DJNZn = new Op(0x10, "DJNZn", map, () -> { //TODO this looks to be a STOP operation
-        int i = mmu.rb(reg.pc());
-        if(i > 127)
-            i = -((~i+1)&255);
+        int i = unsignedByteToSigned(mmu.rb(reg.pc()));
         reg.pcpp(1);
         
         clock.m(2);
