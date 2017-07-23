@@ -463,7 +463,7 @@ public class Debugger extends JFrame{
     }
     
     private void setShortcut(JMenuItem item, int key){
-        KeyStroke sc = KeyStroke.getKeyStroke(key, Toolkit.getDefaultToolkit().getMenuShortcutKeyMask());
+        KeyStroke sc = KeyStroke.getKeyStroke(key, 0); //, Toolkit.getDefaultToolkit().getMenuShortcutKeyMask()
         item.setAccelerator(sc);
     }
     
