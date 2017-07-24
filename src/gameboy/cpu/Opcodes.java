@@ -272,28 +272,27 @@ public class Opcodes {
         return u8;
     }
     
-    private int addCarry(int a, int b){
-        int c = b + (reg.carry() ? 1: 0);
-        int d = a + c;
+    private int addCarry8(int a, int b){
+        int r = (a & 0xF) + (b & 0xF) + (reg.carry() ? 1 : 0);
+        int r2 = a + b + (reg.carry() ? 1 : 0);
         
-        reg.zero(isZero(d));
+        reg.zero(isZero(r2));
         reg.subtract(false);
-        reg.halfcarry(isHalfCarry(a,c));
-        reg.carry(isCarry(d));
+        reg.halfcarry(r > 0xF);
+        reg.carry(r2 > 0xFF);
         
-        return d;
+        return r2;
     }
     
-    private int subCarry(int a, int b){
-        int c = b + (reg.carry() ? 1 : 0);
-        int d = a - c;
+    private int subCarry8(int a, int b){
+        int r2 = (a) - (b) - (reg.carry() ? 1 : 0);
         
-        reg.zero(isZero(d));
+        reg.zero(isZero(r2));
         reg.subtract(true);
-        reg.halfcarry(isHalfCarry(a,-c));
-        reg.carry(isCarry(d));
+        reg.halfcarry(((r2 ^ b ^ a) & 0x10) != 0);
+        reg.carry(r2 > 0xFF || r2 < 0);
         
-        return d;
+        return r2;
     }
     
     private void push(int a){
@@ -1296,7 +1295,7 @@ public class Opcodes {
     //Add A + Carry Flag into registry A
     //int v = addCarry(reg.a(), reg.a());
     Op ADC_A_A = new Op(0x8F, "ADC A,A", map, () -> {
-        int v = addCarry(reg.a(), reg.a());
+        int v = addCarry8(reg.a(), reg.a());
         reg.a(v);
         
         clock.m(1);
@@ -1305,7 +1304,7 @@ public class Opcodes {
     
     //Add B + Carry Flag into registry A
     Op ADC_A_B = new Op(0x88, "ADC A,B", map, () -> {
-        int v = addCarry(reg.a(), reg.b());
+        int v = addCarry8(reg.a(), reg.b());
         reg.a(v);
         
         clock.m(1);
@@ -1314,7 +1313,7 @@ public class Opcodes {
     
     //Add C + Carry Flag into registry A
     Op ADC_A_C = new Op(0x89, "ADC A,C", map, () -> {
-        int v = addCarry(reg.a(), reg.c());
+        int v = addCarry8(reg.a(), reg.c());
         reg.a(v);
         
         clock.m(1);
@@ -1323,7 +1322,7 @@ public class Opcodes {
     
     //Add D + Carry Flag into registry A
     Op ADC_A_D = new Op(0x8A, "ADC A,D", map, () -> {
-        int v = addCarry(reg.a(), reg.d());
+        int v = addCarry8(reg.a(), reg.d());
         reg.a(v);
         
         clock.m(1);
@@ -1332,7 +1331,7 @@ public class Opcodes {
     
     //Add E + Carry Flag into registry A
     Op ADC_A_E = new Op(0x8B, "ADC A,E", map, () -> {
-        int v = addCarry(reg.a(), reg.e());
+        int v = addCarry8(reg.a(), reg.e());
         reg.a(v);
         
         clock.m(1);
@@ -1341,7 +1340,7 @@ public class Opcodes {
     
     //Add H + Carry Flag into registry A
     Op ADC_A_H = new Op(0x8C, "ADC A,H", map, () -> {
-        int v = addCarry(reg.a(), reg.h());
+        int v = addCarry8(reg.a(), reg.h());
         reg.a(v);
         
         clock.m(1);
@@ -1350,7 +1349,7 @@ public class Opcodes {
     
     //Add L + Carry Flag into registry A
     Op ADC_A_L = new Op(0x8D, "ADC A,L", map, () -> {
-        int v = addCarry(reg.a(), reg.l());
+        int v = addCarry8(reg.a(), reg.l());
         reg.a(v);
         
         clock.m(1);
@@ -1359,7 +1358,7 @@ public class Opcodes {
     
     //Add memory at HL + Carry Flag into registry A
     Op ADC_A_HL = new Op(0x8E, "ADC A,(HL)", map, () -> {
-        int v = addCarry(reg.a(), mmu.rb(reg.hl()));
+        int v = addCarry8(reg.a(), mmu.rb(reg.hl()));
         reg.a(v);
         
         clock.m(2);
@@ -1368,7 +1367,7 @@ public class Opcodes {
     
     //Add immediate value n + Carry Flag into registry A
     Op ADC_A_n = new Op(0xCE, "ADC A,n", map, () -> {
-        int v = addCarry(reg.a(), mmu.rb(reg.pc()));
+        int v = addCarry8(reg.a(), mmu.rb(reg.pc()));
         reg.a(v);
         reg.pcpp(1);
         
@@ -1524,7 +1523,7 @@ public class Opcodes {
     //Subtract A + Carry flag from register A
     //int v = subCarry(reg.a(), reg.a());
     Op SBC_A_A = new Op(0x9F, "SBC A,A", map, () -> {
-        int v = subCarry(reg.a(), reg.a());
+        int v = subCarry8(reg.a(), reg.a());
         reg.a(v);
         
         clock.m(1);
@@ -1533,7 +1532,7 @@ public class Opcodes {
     
     //Subtract B + Carry flag from register A
     Op SBC_A_B = new Op(0x98, "SBC A,B", map, () -> {
-        int v = subCarry(reg.a(), reg.b());
+        int v = subCarry8(reg.a(), reg.b());
         reg.a(v);
         
         clock.m(1);
@@ -1542,7 +1541,7 @@ public class Opcodes {
     
     //Subtract C + Carry flag from register A
     Op SBC_A_C = new Op(0x99, "SBC A,C", map, () -> {
-        int v = subCarry(reg.a(), reg.c());
+        int v = subCarry8(reg.a(), reg.c());
         reg.a(v);
         
         clock.m(1);
@@ -1551,7 +1550,7 @@ public class Opcodes {
     
     //Subtract D + Carry flag from register A
     Op SBC_A_D = new Op(0x9A, "SBC A,D", map, () -> {
-        int v = subCarry(reg.a(), reg.d());
+        int v = subCarry8(reg.a(), reg.d());
         reg.a(v);
         
         clock.m(1);
@@ -1560,7 +1559,7 @@ public class Opcodes {
     
     //Subtract E + Carry flag from register A
     Op SBC_A_E = new Op(0x9B, "SBC A,E", map, () -> {
-        int v = subCarry(reg.a(), reg.e());
+        int v = subCarry8(reg.a(), reg.e());
         reg.a(v);
         
         clock.m(1);
@@ -1570,7 +1569,7 @@ public class Opcodes {
     
     //Subtract H + Carry flag from register A
     Op SBC_A_H = new Op(0x9C, "SBC A,H", map, () -> {
-        int v = subCarry(reg.a(), reg.h());
+        int v = subCarry8(reg.a(), reg.h());
         reg.a(v);
         
         clock.m(1);
@@ -1579,7 +1578,7 @@ public class Opcodes {
     
     //Subtract L + Carry flag from register A
     Op SBC_A_L = new Op(0x9D, "SBC A,L", map, () -> {
-        int v = subCarry(reg.a(), reg.l());
+        int v = subCarry8(reg.a(), reg.l());
         reg.a(v);
         
         clock.m(1);
@@ -1588,7 +1587,7 @@ public class Opcodes {
     
     //Subtract memory at HL + Carry flag from register A
     Op SBC_A_HL = new Op(0x9E, "SBC A,(HL)", map, () -> {
-        int v = subCarry(reg.a(), mmu.rb(reg.hl()));
+        int v = subCarry8(reg.a(), mmu.rb(reg.hl()));
         reg.a(v);
         
         clock.m(2);
@@ -1597,7 +1596,7 @@ public class Opcodes {
     
     //Subtract immediate value n + Carry flag from register A
     Op SBC_A_n = new Op(0xDE, "SBC A,n", map, () -> {
-        int v = subCarry(reg.a(), mmu.rb(reg.pc()));
+        int v = subCarry8(reg.a(), mmu.rb(reg.pc()));
         reg.a(v);
         reg.pcpp(1);
         

@@ -9,12 +9,14 @@ import gameboy.game.Cartridge;
 import gameboy.game.CartridgeFactory;
 import java.awt.Color;
 import java.awt.Dimension;
+import java.awt.GridLayout;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.io.File;
 import java.io.FilenameFilter;
 import javax.swing.BoxLayout;
 import javax.swing.DefaultListCellRenderer;
+import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JList;
 import javax.swing.JPanel;
@@ -22,6 +24,7 @@ import javax.swing.JScrollPane;
 import javax.swing.ListSelectionModel;
 import javax.swing.SwingConstants;
 import main.swing.utilities.Debugger;
+import main.swing.utilities.RomViewer;
 
 /**
  *
@@ -56,29 +59,6 @@ public class SwingLauncher extends JFrame{
         ((DefaultListCellRenderer)(body.getCellRenderer())).setForeground(Color.WHITE);
         
         body.setBackground(Color.BLACK);
-        body.addMouseListener(new MouseAdapter(){
-            @Override
-            public void mouseClicked(MouseEvent evt) {
-                JList list = (JList)evt.getSource();
-                switch(evt.getClickCount()){
-                    case 2:
-                        Cartridge cart = carts[list.locationToIndex(evt.getPoint())];
-                                
-                        SwingGB gb = new SwingGB(!enableDebugger);
-                        gb.GetGameboy().LoadCartridge(cart);
-                        gb.setTitle("Playing: "+cart.info.title);
-                        gb.setVisible(true);
-                        
-                        if(enableDebugger){
-                            Debugger debugger = new Debugger(gb);
-                            debugger.setVisible(true);
-                        }
-                        
-                        System.out.println(cart.info.toString());
-                        break;
-                }
-            }
-        });
         
         JScrollPane scroller = new JScrollPane(body){
             public Dimension getPreferredSize(){
@@ -87,6 +67,35 @@ public class SwingLauncher extends JFrame{
         };
         
         contentPane.add(scroller);
+        
+        JButton launch = new JButton("Launch");
+        launch.addActionListener((evt) -> {
+            Cartridge cart = carts[body.getSelectedIndex()];
+                                
+            SwingGB gb = new SwingGB(!enableDebugger);
+            gb.GetGameboy().LoadCartridge(cart);
+            gb.setTitle("Playing: "+cart.info.title);
+            gb.setVisible(true);
+
+            if(enableDebugger){
+                Debugger debugger = new Debugger(gb);
+                debugger.setVisible(true);
+            }
+        });
+        
+        JButton info = new JButton("Info");
+        info.addActionListener((evt) -> {
+            Cartridge cart = carts[body.getSelectedIndex()];
+            RomViewer viewer = new RomViewer(cart);
+            viewer.setVisible(true);
+        });
+        
+        JPanel footer = new JPanel();
+        footer.setLayout(new GridLayout(-1,1));
+        footer.add(launch);
+        footer.add(info);
+        
+        contentPane.add(footer);
         
         this.add(contentPane);
     }

@@ -162,10 +162,19 @@ public class Gpu implements IMemory{
         }
     }
     
+    public int GetBgMapBase(){
+        return tilemapdisplayselect ? 0x1C00 : 0x1800;
+    }
+    
+    public int GetBgTileBase(){
+        return tiledatatable ? 0x0000 : 0x0800;
+        //return tiledatatable ? 0x0800 : 0x0000;
+    }
+    
     public void renderTiles(int[] scanrow){
         int pixelY = curline;
-        int bgmapbase = tilemapdisplayselect ? 0x1C00 : 0x1800;
-        int bgtilebase = tiledatatable ? 0x0800 : 0x0000;
+        int bgmapbase = GetBgMapBase();
+        int bgtilebase = GetBgTileBase();
         int mapbase = (bgmapbase) + ((((curline + yscroll)&255)>>3)<<5);
         
         int y = (curline + yscroll) & 7;

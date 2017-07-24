@@ -19,10 +19,22 @@ public class SerialConnection implements IMemory{
     private InputStreamReader reader;
     private OutputStreamWriter writer;
     
+    private boolean enableOut = false;
+    private boolean enableIn = false;
+    
     public SerialConnection(InputStreamReader reader, OutputStreamWriter writer){
         this.reader = reader;
         this.writer = writer;
     }
+    
+    public void EnableRead(boolean b){
+        enableIn = b;
+    }
+    
+    public void EnableWrite(boolean b){
+        enableOut = b;
+    }
+    
     
     @Override
     public void Reset() {}
@@ -30,7 +42,12 @@ public class SerialConnection implements IMemory{
     @Override
     public int rb(int addr) {
         try{
-            return reader.read() & 0xFF;
+            if(enableIn){
+                return reader.read() & 0xFF;
+            }
+            else{
+                return 0;
+            }
         }catch(Exception e){
             return 0;
         }
@@ -39,9 +56,10 @@ public class SerialConnection implements IMemory{
     @Override
     public void wb(int addr, int value) {
         try{
-            byte converteValue = (byte)value;
-            writer.append(new String(new byte[]{converteValue},"US-ASCII"));
-            writer.flush();
+            if(enableOut){
+                writer.append(new String(new byte[]{(byte)value},"US-ASCII"));
+                writer.flush();
+            }
         }catch(Exception e){
             
         }

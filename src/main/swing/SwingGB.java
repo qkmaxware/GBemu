@@ -7,6 +7,8 @@ package main.swing;
 
 import gameboy.Gameboy;
 import java.awt.Dimension;
+import java.awt.event.KeyEvent;
+import java.awt.event.KeyListener;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -32,6 +34,23 @@ public class SwingGB extends JFrame{
         panel.setPreferredSize(new Dimension(166, 144)); //Same size as GB canvas
         this.add(panel);
         this.pack();
+        
+        //Create the user input listener
+        panel.addKeyListener(new KeyListener(){
+            @Override
+            public void keyTyped(KeyEvent ke) {}
+
+            @Override
+            public void keyPressed(KeyEvent ke) {
+                gb.input.KeyDown(ke);
+            }
+
+            @Override
+            public void keyReleased(KeyEvent ke) {
+                gb.input.KeyUp(ke);
+            }
+        
+        });
         
         //Assign the event listeners
         gb.OnBufferReady(() -> {
