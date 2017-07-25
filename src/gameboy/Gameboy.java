@@ -88,7 +88,6 @@ public class Gameboy {
     public void Dispatch(){
         //Step the cpu
         int deltaTime = cpu.Step();
-        //System.out.println(this);
         
         //Step the gpu
         gpu.Step(deltaTime);

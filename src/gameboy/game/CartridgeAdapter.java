@@ -5,22 +5,15 @@
  */
 package gameboy.game;
 
+import gameboy.game.controller.*;
 import gameboy.IMemory;
 import gameboy.MemoryMap;
-import java.util.Arrays;
 
 /**
- *
+ * Acts as a stable interface between a game cartridge and a memory model
  * @author Colin Halseth
  */
 public class CartridgeAdapter implements IMemory{
-    
-    public static final int ERAM_SIZE = 32768;
-    
-    private int[] eram = new int[ERAM_SIZE]; //External Cartridge RAM
-    
-    private int romoff = 0x4000;
-    private int ramoff = 0;
     
     private Cartridge cart;
     private MBC controller;
@@ -30,15 +23,15 @@ public class CartridgeAdapter implements IMemory{
         
         switch(cart.info.cartType){
             case MBC1:
-                controller = (MBC) new MBC1();
+                controller = (MBC) new MBC1(cart);
                 break;
+            case MBC2:
+                controller = (MBC) new MBC2(cart);
+            case MBC3:
+                controller = (MBC) new MBC3(cart);
             default:
-                controller = null;
+                controller = (MBC) new RomOnly(cart);
         }
-    }
-    
-    private static boolean in(int x, int lower, int upper) {
-        return lower <= x && x <= upper;
     }
     
     public boolean supportsCGB(){
@@ -47,45 +40,42 @@ public class CartridgeAdapter implements IMemory{
         return cart.supportsCGB();
     }
     
+    /*
+    public void LoadRam() throws IOException{
+        BufferedReader reader = new BufferedReader(new FileReader(this.cart.source.getAbsolutePath()+".battery"));
+        String s; int idx = 0;
+        while((s = reader.readLine()) != null && idx < eram.length){
+            eram[idx] = Integer.parseInt(s, 16);
+        }
+    }
+    
+    public void SaveRam() throws IOException{
+        BufferedWriter ow = new BufferedWriter(new FileWriter(this.cart.source.getAbsolutePath()+".battery"));
+        for(int i = 0; i < this.eram.length; i++){
+            ow.write(Integer.toHexString(eram[i]));
+            ow.newLine();
+        }
+        ow.flush();
+        ow.close();
+    }*/
+    
     @Override
     public void Reset() {
-        Arrays.fill(eram, 0);
-        
-        romoff = 0x4000;
-        ramoff = 0;
+        if(this.controller != null)
+            this.controller.Reset();
     }
 
     @Override
     public int rb(int addr) {
-        if(in(addr, 0, 0x3FFF)){
-            //Cartridge ROM (fixed) (rom bank 0)
-            if(cart == null)
-                return 0;
-            return cart.read(addr);
-        }
-        else if(in(addr, 0x4000, 0x7FFF)){
-            //Cartridge ROM (switchable) (rom bank 1)
-            if(cart == null)
-                return 0;
-            return cart.read(romoff + (addr&0x3FFF));
-        }
-        else if(in(addr, 0xA000, 0xBFFF)){
-            //External cartridge RAM
-            return eram[ramoff + (addr&0x1FFF)]; //eram[ramoffs+(addr&0x1FFF)];
-        }
+        if(this.controller != null)
+            return this.controller.rb(addr);
         return 0;
     }
 
     @Override
     public void wb(int addr, int value) {
-        //TODO write byte to cause MBC changes
-        if(controller != null)
-            controller.hasOccurredWrite(this, addr, value);
-        
-        if(in(addr, 0xA000, 0xBFFF)){
-            //External cartridge RAM
-            eram[ramoff + (addr&0x1FFF)] = value; //eram[ramoffs+(addr&0x1FFF)];
-        }
+        if(this.controller != null)
+            this.controller.wb(addr, value);
     }
     
     public void SetMMU(MemoryMap mmu){}

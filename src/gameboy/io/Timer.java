@@ -55,8 +55,9 @@ public class Timer implements IMemory{
             
             clock.div ++;
             if(clock.div == 16){
-                clock.div = (reg.div + 1) & 255;
                 clock.div = 0;
+                reg.div++;
+                reg.div &= 255;
             }
         }
         

@@ -20,7 +20,7 @@ public class Input implements IMemory{
     private int colidx = 0;
     private Timer timer = new Timer();
     
-    public enum Key{
+    public static enum Key{
         Up, Down, Left, Right, Select, Start, A, B
     }
     
@@ -68,6 +68,28 @@ public class Input implements IMemory{
         }
     }
     
+    public boolean IsKeyDown(Key key){
+        switch(key){
+            case Up:
+                return (rows[1] &= 0x4) == 0;
+            case Down:
+                return (rows[1] &= 0x8) == 0;
+            case Left:
+                return (rows[1] &= 0x2) == 0;
+            case Right:
+                return (rows[1] &= 0x1) == 0;
+            case Select:
+                return (rows[1] &= 0x8) == 0;
+            case Start:
+                return (rows[1] &= 0x4) == 0;
+            case A:
+                return (rows[1] &= 0x1) == 0;
+            case B:
+                return (rows[1] &= 0x2) == 0;
+        }
+        return false;
+    }
+    
     public void KeyDown(KeyEvent evt){
         int keycode = evt.getKeyCode();
         if(keycode == up){
@@ -99,28 +121,28 @@ public class Input implements IMemory{
     public void KeyUp(KeyEvent evt){
         int keycode = evt.getKeyCode();
         if(keycode == up){
-            rows[1] &= 0x4;
+            rows[1] |= 0x4;
         }
         else if(keycode == down){
-            rows[1] &= 0x8;
+            rows[1] |= 0x8;
         }
         else if(keycode == left){
-            rows[1] &= 0x2;
+            rows[1] |= 0x2;
         }
         else if(keycode == right){
-            rows[1] &= 0x1;
+            rows[1] |= 0x1;
         }
         else if(keycode == start){
-            rows[0] &= 0x8;
+            rows[0] |= 0x8;
         }
         else if(keycode == select){
-            rows[0] &= 0x4;
+            rows[0] |= 0x4;
         }
         else if(keycode == a){
-            rows[0] &= 0x1;
+            rows[0] |= 0x1;
         }
         else if(keycode == b){
-            rows[0] &= 0x2;
+            rows[0] |= 0x2;
         }
     }
     

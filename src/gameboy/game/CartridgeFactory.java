@@ -5,7 +5,6 @@
  */
 package gameboy.game;
 
-import gameboy.game.Cartridge;
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
