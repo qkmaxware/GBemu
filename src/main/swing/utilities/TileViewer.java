@@ -8,7 +8,6 @@ package main.swing.utilities;
 import gameboy.Gameboy;
 import gameboy.gpu.Bitmap;
 import gameboy.gpu.Gpu;
-import gameboy.gpu.Sprite;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
@@ -16,10 +15,10 @@ import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.GridLayout;
 import java.awt.RenderingHints;
+import javax.swing.BorderFactory;
 import javax.swing.ButtonGroup;
 import javax.swing.JButton;
 import javax.swing.JFrame;
-import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JRadioButton;
@@ -63,7 +62,7 @@ public class TileViewer extends JFrame{
         
         this.setLayout(new BorderLayout());
         
-        this.setSize(400,340);
+        this.setSize(500,340);
         
         JPanel header = new JPanel();
         
@@ -77,7 +76,7 @@ public class TileViewer extends JFrame{
         });
         
         tileid = new JTextField(String.valueOf(this.selected));
-        tileid.setPreferredSize(new Dimension(100, 32));
+        tileid.setPreferredSize(new Dimension(50, 32));
         tileid.setEditable(false);
         
         JButton right = new JButton(">");
@@ -112,7 +111,10 @@ public class TileViewer extends JFrame{
         this.drawPanel = center;
         center.draw = (g2) -> {
             g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
-            g2.drawImage(bmp.GetImage(), 0, 0, center.getWidth(), center.getHeight(), null);
+            int min = Math.min(center.getWidth(), center.getHeight());
+            g2.setColor(this.getBackground());
+            g2.fillRect(0, 0, this.getWidth(), this.getHeight());
+            g2.drawImage(bmp.GetImage(), 0, 0, min, min, null);
         };
         
         JButton refresh = new JButton("Refresh");
@@ -121,9 +123,9 @@ public class TileViewer extends JFrame{
         });
         
         JPanel leftPanel = new JPanel();
-        leftPanel.setLayout(new BorderLayout());
-        leftPanel.add(center, BorderLayout.CENTER);
-        leftPanel.add(header, BorderLayout.NORTH);
+        leftPanel.setLayout(new GridLayout(-1,1));
+        leftPanel.add(header);
+        leftPanel.add(center);
         this.add(refresh, BorderLayout.SOUTH);
         
         JPanel rightPanel = new JPanel();
@@ -142,11 +144,12 @@ public class TileViewer extends JFrame{
         b8000.addActionListener((evt) -> {base=0; Refresh();});
         b8800.addActionListener((evt) -> {base=1; Refresh();});
         group.add(b8000); group.add(b8800);
+        b8000.setSelected(true);
         JPanel ft = new JPanel();
-        ft.add(new JLabel("Charbase"));
+        ft.setBorder(BorderFactory.createTitledBorder("Char Base"));
         ft.add(b8000);
         ft.add(b8800);
-        rightPanel.add(ft, BorderLayout.NORTH);
+        leftPanel.add(ft);
         
         this.add(leftPanel, BorderLayout.WEST);
         this.add(rightPanel, BorderLayout.CENTER);

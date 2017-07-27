@@ -265,7 +265,9 @@ public class Bitmap {
      * @param argb 
      */
     public void SetARGB(int x, int y, int argb){
-        this.argb[y*width + x] = argb;
+        int idx = y*width + x;
+        if(idx >= 0 && idx < this.argb.length)
+            this.argb[idx] = argb;
     }
     
     /**

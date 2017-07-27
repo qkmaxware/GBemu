@@ -49,50 +49,48 @@ public class RomInfo {
         Unknown, NONE, KB2, KB8, KB32, KB128, KB64
     }
     
-    public String title;
-    public Region region;
-    public SgbSupport sgb;
-    public CgbSupport cgb;
-    public String manufacturerCode;
-    public int licenceeCode;
-    public LicenceeCode licencee;
-    public int cartTypeId;
-    public CartType cartType;
-    public int romBanks;
-    public int romSize;
-    public RomSizeClass romSizeClass;
-    public int ramBanks;
-    public int ramSize;
-    public RamSizeClass ramSizeClass;
-    public String oldLicenceeCode;
-    public int headerChecksum;
-    public int globalChecksum;
+    public final String title;
+    public final Region region;
+    public final SgbSupport sgb;
+    public final CgbSupport cgb;
+    public final String manufacturerCode;
+    public final int licenceeCode;
+    public final LicenceeCode licencee;
+    public final CartType cartType;
+    public final int romBanks;
+    public final int romSize;
+    public final RomSizeClass romSizeClass;
+    public final int ramBanks;
+    public final int ramSize;
+    public final RamSizeClass ramSizeClass;
+    public final int headerChecksum;
+    public final int globalChecksum;
     
-    public int version;
+    public final int version;
     
     public RomInfo(int[] romBank){
        
         //Title
+        String t = "Unknown";
         try{
             byte[] btt = new byte[16];
             for(int i = 0x0134, j=0; i <= 0x0143; i++, j++){
                 btt[j] = (byte)romBank[i];
             }
-            this.title = new String(btt,"US-ASCII");
-        }catch(Exception e){
-            this.title = "Unknown";
-        }
-    
+            t = new String(btt,"US-ASCII");
+        }catch(Exception e){}
+        this.title = t;
+        
         //Manufacturer's code (in some older cartridges)
+        String mancode = "Unknown";
         try{
             byte[] btt = new byte[4];
             for(int i = 0x013F, j=0; i <= 0x0142; i++, j++){
                 btt[j] = (byte)romBank[i];
             }
-            this.manufacturerCode = new String(btt,"US-ASCII");
-        }catch(Exception e){
-            this.manufacturerCode = "Unknown";
-        }
+            mancode = new String(btt,"US-ASCII");
+        }catch(Exception e){}
+        this.manufacturerCode = mancode;
         
         //CGB Flag
         switch(romBank[0x0143]){
@@ -410,10 +408,6 @@ public class RomInfo {
         //Ram size
         this.ramSize = romBank[0x0149];
         switch(this.ramSize){
-            case 0x00:
-                this.ramSizeClass = RamSizeClass.NONE;
-                this.ramBanks = 0;
-                break;
             case 0x01:
                 this.ramSizeClass = RamSizeClass.KB2;
                 this.ramBanks = 1;
@@ -433,6 +427,11 @@ public class RomInfo {
             case 0x05:
                 this.ramSizeClass = RamSizeClass.KB64;
                 this.ramBanks = 8;
+                break;
+            case 0x00:
+            default:
+                this.ramSizeClass = RamSizeClass.NONE;
+                this.ramBanks = 0;
                 break;
         }
         

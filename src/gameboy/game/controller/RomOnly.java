@@ -24,9 +24,6 @@ public class RomOnly implements MBC{
     }
     
     @Override
-    public void hasOccurredWrite(int addr, int value) {}
-
-    @Override
     public int GetRamOffset() {
         return 0;
     }
@@ -74,8 +71,6 @@ public class RomOnly implements MBC{
         //Create the appropriate offsets if required
         int romoff = GetRomOffset(); //Rom bank 1
         int ramoff = GetRamOffset();
-        
-        this.hasOccurredWrite(addr, value);
         
         if(in(addr, 0xA000, 0xBFFF)){
             //External cartridge RAM

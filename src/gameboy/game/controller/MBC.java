@@ -14,13 +14,6 @@ import gameboy.game.CartridgeAdapter;
 public interface MBC{
     
     /**
-     * If a write has occurred to the cartridge, check if an action is performed in accordance with MBC rules
-     * @param addr
-     * @param value 
-     */
-    public void hasOccurredWrite(int addr, int value);
-    
-    /**
      * Get the offset value to use for ram access
      * @return 
      */

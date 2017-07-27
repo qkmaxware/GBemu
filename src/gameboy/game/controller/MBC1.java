@@ -58,11 +58,15 @@ public class MBC1 implements MBC{
             //Cartridge ROM (switchable) (rom bank 1)
             if(cart == null)
                 return 0;
-            return cart.read((romoff + (addr&0x3FFF)));
+            return cart.read((romoff + (addr - 0x4000)));
         }
         else if(in(addr, 0xA000, 0xBFFF)){
             //External cartridge RAM
-            return eram[ramoff + (addr&0x1FFF)]; //eram[ramoffs+(addr&0x1FFF)];
+            if(!ramSelected){
+                return eram[addr - 0xA000];
+            }else{
+                return eram[(addr - 0xA000) + ramoff];
+            }
         }
         return 0;
     }
@@ -76,7 +80,11 @@ public class MBC1 implements MBC{
         
         if(in(addr, 0xA000, 0xBFFF)){
             //External cartridge RAM
-            eram[ramoff + (addr&0x1FFF)] = value; //eram[ramoffs+(addr&0x1FFF)];
+            if(!ramSelected){
+                eram[addr - 0xA000] = value;
+            }else{
+                eram[(addr - 0xA000) + ramoff] = value;
+            }
         }
     }
     
@@ -85,33 +93,41 @@ public class MBC1 implements MBC{
      * @param addr
      * @param value 
      */
-    @Override
     public void hasOccurredWrite(int addr, int value){
         if(addr >= 0x0000 && addr <= 0x1FFF){
             //Enable RAM. Any Value with 0x0AH in the lower 4 bits enables ram, other values disable ram
-            ramEnabled = (value & 0x0A) == 0x0A;
+            ramEnabled = (value & 0x0F) == 0x0A;
         }else if(addr >= 0x2000 && addr <= 0x3FFF){
-            //Writing to this adddress selects the lower 5 bits of the rom back number 01-1Fh, 
-            //if 00 is written, bank 1 is still selected
-            if((value & 0xFF) == 0)
-                value = 1;
+            if(!ramSelected){
+                //If rammode not selected, this represents the lower 5 bits, preserve the upper 5 bits
+                rombank = (value & 0x1F) | ((rombank >> 5) << 5);
+            }else{
+                rombank = value & 0x1F;
+            }
             
-            rombank &= 0x60;                        //Clear lower bits
-            rombank |= Math.max(value & 0x1F, 1);   //Set lower bits
+            //Never select 0th rombank
+            if(rombank == 0x00 || rombank == 0x20 || rombank == 0x40 || rombank == 0x60){
+                rombank++;
+            }
+            
+            rombank &= (cart.info.romBanks - 1);
+            
         }else if(addr >= 0x4000 && addr <= 0x5FFF){
             //This 2 bit register can be used to select a ram bank in the range 00-03 or specify the upper 2 bits of the bank number
             //This behavior depends on the ROM/RAM mode select
             if(!ramSelected){
-                rombank &= 0x1F;               //Clear upper 2 bits
-                rombank |= (value & 3) << 5;   //Set upper 2 bits
+                rombank = (rombank & 0x1F) | ((value & 3) << 5);   //Set upper 2 bits
+                rombank &= (cart.info.romBanks - 1);
+            
             }else{
-                rambank = value & 0b11;         //Set rambank number
+                rambank = value & 3;          //Set rambank number
+                rambank &= (cart.info.ramBanks - 1);
             }
         }
         else if(addr >= 6000 && addr <= 0x7FFF){
             //This one bit register selects whether the two bits above should be used as the upper two bits of the rom bank
             //or as the ram bank number
-            ramSelected = (value & 0x1) == 0x1; //Ram banking mode, else Rom banking mode
+            ramSelected = (value & 0x1) != 0; //Ram banking mode, else Rom banking mode
         }
     }
     

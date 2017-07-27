@@ -81,9 +81,9 @@ public class Gpu implements IMemory{
     public boolean vblankInterruptEnable = false;
     public boolean hblankInterruptEnable = false;
     
-    public boolean windowtile = false;    //False = 0x1800, true = unknown
-    public boolean tiledatatable = false; //false = 0x0000;  true = 0x0800
-    public boolean tilemapdisplayselect = false;  //false = 0x1800;  true = 0x1C00
+    public boolean useLargerWindowTileStartAddress = false;    //False = 0x1800, true = unknown
+    public boolean useSmallerTileStartAddress = false; //false = 0x0000;  true = 0x0800
+    public boolean useLargerTileMapStartAddress = false;  //false = 0x1800;  true = 0x1C00
     
     public Listener OnVBlank;
     
@@ -155,6 +155,7 @@ public class Gpu implements IMemory{
         
         if(bgon){
             renderTiles(scanrow);
+            //drawBackgroundLine(this.curline, scanrow);
         }
         
         if(objon){
@@ -162,19 +163,28 @@ public class Gpu implements IMemory{
         }
     }
     
-    public int GetBgMapBase(){
-        return tilemapdisplayselect ? 0x1C00 : 0x1800;
+    public int GetWindowMapStartAddress(){ //Bit 6
+        return useLargerWindowTileStartAddress ? 0x1C00 : 0x1800;
     }
     
-    public int GetBgTileBase(){
-        return tiledatatable ? 0x0000 : 0x0800;
-        //return tiledatatable ? 0x0800 : 0x0000;
+    public int GetBgMapStartAddress(){ //Bit 3
+        return useLargerTileMapStartAddress ? 0x1C00 : 0x1800;
     }
+    
+    public int GetBgTileStartAddress(){ //Bit 4
+        return useSmallerTileStartAddress ? 0x0000 : 0x0800;
+    }
+    
+    public boolean IsBgTileAddressRegionUnsigned(){
+        return useSmallerTileStartAddress ? true : false;
+    }
+    
+    
     
     public void renderTiles(int[] scanrow){
         int pixelY = curline;
-        int bgmapbase = GetBgMapBase();
-        int bgtilebase = GetBgTileBase();
+        int bgmapbase = GetBgMapStartAddress();
+        int bgtilebase = GetBgTileStartAddress();
         int mapbase = (bgmapbase) + ((((curline + yscroll)&255)>>3)<<5);
         
         int y = (curline + yscroll) & 7;
@@ -343,9 +353,9 @@ public class Gpu implements IMemory{
         objon = false;
         bgon = false;
     
-        windowtile = false;
-        tiledatatable = false;
-        tilemapdisplayselect = false;
+        useLargerWindowTileStartAddress = false;
+        useSmallerTileStartAddress = false;
+        useLargerTileMapStartAddress = false;
         
         reg.clear();
         
@@ -507,10 +517,10 @@ public class Gpu implements IMemory{
                         (largeobj ? 0x04 : 0) | 
                         (objon ? 0x02 : 0) | 
                         (bgon ? 0x01 : 0) | 
-                        ((tiledatatable) ? 0x10 : 0) | 
-                        ((tilemapdisplayselect) ? 0x08 : 0) |
+                        ((useSmallerTileStartAddress) ? 0x10 : 0) | 
+                        ((useLargerTileMapStartAddress) ? 0x08 : 0) |
                         (windowon ? 0x20 : 0) |
-                        (windowtile? (0x40) : 0);
+                        (useLargerWindowTileStartAddress? (0x40) : 0);
             case 0xFF41:    //LCD Status
                 return getLcdStatus();
             case 0xFF42:    //Scroll Y         
@@ -554,14 +564,14 @@ public class Gpu implements IMemory{
         reg.put(addr, value);
         switch(addr){
             case 0xFF40:    //LCD Control
-                lcdon = (value & 0x80) != 0;                    //BIT 7 - LCD Display (1=on, 0=off)
-                windowtile = (value & 0x40) != 0;               //BIT 6 - Window Tile Map Display (0=9800-9BFF, 1=9C00-9FFF)
-                windowon = (value & 0x20) != 0;                 //BIT 5 - Window Tile Display Enable (0=off, 1=on)
-                tiledatatable = ((value&0x10) != 0);            //BIT 4 - BG Tile Data Select (0=8800-97FF, 1=8000-8FFF)
-                tilemapdisplayselect = ((value&0x08) != 0);     //BIT 3 - BG Tile Map Select (0=9800-9BFF, 1=9C00-9FFF)
-                largeobj = (value&0x04) != 0;                   //BIT 2 - Sprite Size (0=8x8, 1=8x16)
-                objon = (value&0x02) != 0;                      //BIT 1 - Sprite Display (0=off, 1=on)
-                bgon = (value&0x01) != 0;                       //BIT 0 - BG Display (0=off, 1=on)
+                lcdon = (value & 0x80) != 0;                            //BIT 7 - LCD Display (1=on, 0=off)
+                useLargerWindowTileStartAddress = (value & 0x40) != 0;  //BIT 6 - Window Tile Map Display (0=9800-9BFF, 1=9C00-9FFF)
+                windowon = (value & 0x20) != 0;                         //BIT 5 - Window Tile Display Enable (0=off, 1=on)
+                useSmallerTileStartAddress = ((value&0x10) != 0);       //BIT 4 - BG Tile Data Select (0=8800-97FF, 1=8000-8FFF)
+                useLargerTileMapStartAddress = ((value&0x08) != 0);     //BIT 3 - BG Tile Map Select (0=9800-9BFF, 1=9C00-9FFF)
+                largeobj = (value&0x04) != 0;                           //BIT 2 - Sprite Size (0=8x8, 1=8x16)
+                objon = (value&0x02) != 0;                              //BIT 1 - Sprite Display (0=off, 1=on)
+                bgon = (value&0x01) != 0;                               //BIT 0 - BG Display (0=off, 1=on)
                 break;
             case 0xFF41:    //LCD Status
                 setLcdStatus(value);

@@ -83,7 +83,6 @@ public class MBC2 implements MBC{
      * @param addr
      * @param value 
      */
-    @Override
     public void hasOccurredWrite(int addr, int value){
         if(addr >= 0x0000 && addr <= 0x1FFF){
             //Enable RAM. Any Value with 0x0AH in the lower 4 bits enables ram, other values disable ram
