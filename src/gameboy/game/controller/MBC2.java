@@ -44,7 +44,7 @@ public class MBC2 implements MBC{
     public int rb(int addr){
         //Create the appropriate offsets if required
         int romoff = GetRomOffset(); //Rom bank 1
-        int ramoff = GetRamOffset();
+        int ramoff = 0;
         
         if(in(addr, 0, 0x3FFF)){
             //Cartridge ROM (fixed) (rom bank 0)
@@ -67,7 +67,7 @@ public class MBC2 implements MBC{
     
     public void wb(int addr, int value){
         //Create the appropriate offsets if required
-        int ramoff = GetRamOffset();
+        int ramoff = 0;
         
         this.hasOccurredWrite(addr, value);
         

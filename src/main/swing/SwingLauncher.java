@@ -19,7 +19,9 @@ import javax.swing.DefaultListCellRenderer;
 import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JList;
+import javax.swing.JMenuItem;
 import javax.swing.JPanel;
+import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
 import javax.swing.ListSelectionModel;
 import javax.swing.SwingConstants;
@@ -31,11 +33,15 @@ import main.swing.utilities.RomViewer;
  * @author Colin Halseth
  */
 public class SwingLauncher extends JFrame{
+     
+    public String romLocation = "./roms/";
     
-    private String romLocation = "./roms/";
-    private boolean enableDebugger = true;
+    public boolean autoPlay = false;
+    public boolean enableDebugger = true;
     
-    public SwingLauncher(){
+    public SwingLauncher(){}
+    
+    public void BuildFrame(){
         //Buid swing components
         this.setTitle("Gameboy Emulator");
         this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -57,8 +63,35 @@ public class SwingLauncher extends JFrame{
         body.setFixedCellHeight(32);
         ((DefaultListCellRenderer)(body.getCellRenderer())).setHorizontalAlignment(SwingConstants.CENTER);
         ((DefaultListCellRenderer)(body.getCellRenderer())).setForeground(Color.WHITE);
-        
         body.setBackground(Color.BLACK);
+        body.setForeground(Color.WHITE);
+        
+        body.addMouseListener(new MouseAdapter(){
+            @Override
+            public void mouseReleased(MouseEvent e){
+                int rowindex = body.locationToIndex(e.getPoint());
+                if (rowindex < 0)
+                    return;
+                if(e.isPopupTrigger()){
+                    System.out.println("olo");
+                    JPopupMenu menu = new JPopupMenu();
+                    JMenuItem ll = new JMenuItem("Launch");
+                    ll.addActionListener((evt) -> {
+                        Cartridge cart = carts[rowindex];
+                        StartEmulator(cart); 
+                    });
+                    JMenuItem info = new JMenuItem("Info");
+                    info.addActionListener((evt) -> {
+                        Cartridge cart = carts[rowindex];
+                        RomViewer viewer = new RomViewer(cart);
+                        viewer.setVisible(true);
+                    });
+                    menu.add(ll);
+                    menu.add(info);
+                    menu.show(e.getComponent(), e.getX(), e.getY());
+                }
+            }
+        });
         
         JScrollPane scroller = new JScrollPane(body){
             public Dimension getPreferredSize(){
@@ -71,37 +104,35 @@ public class SwingLauncher extends JFrame{
         JButton launch = new JButton("Launch");
         launch.addActionListener((evt) -> {
             Cartridge cart = carts[body.getSelectedIndex()];
-                                
-            SwingGB gb = new SwingGB(!enableDebugger);
-            gb.GetGameboy().LoadCartridge(cart);
-            gb.setTitle("Playing: "+cart.info.title);
-            gb.setVisible(true);
-
-            if(enableDebugger){
-                Debugger debugger = new Debugger(gb);
-                debugger.setVisible(true);
-            }
-        });
-        
-        JButton info = new JButton("Info");
-        info.addActionListener((evt) -> {
-            Cartridge cart = carts[body.getSelectedIndex()];
-            RomViewer viewer = new RomViewer(cart);
-            viewer.setVisible(true);
+            StartEmulator(cart);             
         });
         
         JPanel footer = new JPanel();
         footer.setLayout(new GridLayout(-1,1));
         footer.add(launch);
-        footer.add(info);
         
         contentPane.add(footer);
         
         this.add(contentPane);
     }
     
+    public void StartEmulator(Cartridge cart){
+        SwingGB gb = new SwingGB(autoPlay);
+        gb.GetGameboy().LoadCartridge(cart);
+        gb.setTitle("Playing: "+cart.info.title);
+        gb.setVisible(true);
+
+        if(enableDebugger){
+            Debugger debugger = new Debugger(gb);
+            debugger.setVisible(true);
+        }
+    }
+    
     public Cartridge[] GetLocalCartridges(){
         File dir = new File(this.romLocation);
+        if(!dir.exists())
+            return new Cartridge[0];
+        
         File[] files = dir.listFiles(new FilenameFilter() {
             @Override
             public boolean accept(File dir, String name) {

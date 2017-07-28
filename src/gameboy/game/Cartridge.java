@@ -30,6 +30,12 @@ public class Cartridge{
         return (info.cgb == RomInfo.CgbSupport.CbgAllowed || info.cgb == RomInfo.CgbSupport.CbgRequired);
     }
     
+    public boolean HasRam(){
+        return info.ramSizeClass != RomInfo.RamSizeClass.Unknown && 
+                info.ramSizeClass != RomInfo.RamSizeClass.NONE &&
+                info.ramBanks != 0;
+    }
+    
     public String toString(){
         return (source == null ? info.title : source.getName());
     }

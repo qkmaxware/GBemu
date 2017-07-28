@@ -6,6 +6,7 @@
 package gameboy.game.controller;
 
 import gameboy.game.Cartridge;
+import gameboy.game.RomInfo;
 import java.util.Arrays;
 import java.util.Calendar;
 
@@ -24,7 +25,7 @@ public class MBC3 implements MBC{
         public boolean carry = false;
         
         private Calendar calendar;
-        public int bank = 0x08;
+        public int rtcRegister = 0x08;
         
         public RTC(){
             calendar = Calendar.getInstance();
@@ -40,14 +41,14 @@ public class MBC3 implements MBC{
         }
         
         public void Reset(){
-            bank = 0x08;
+            rtcRegister = 0x08;
             halt = false;
             carry = false;
             LatchCurrent();
         }
         
-        public int rb(int addr){
-            switch(bank){
+        public int rb(){
+            switch(rtcRegister){
                 case 0x08: //Seconds
                     return this.s;
                 case 0x09: //Minutes
@@ -59,11 +60,11 @@ public class MBC3 implements MBC{
                 case 0x0C: //Upper bit of day plus flags in bits 6 and 7
                     return ((this.day >> 8) & 0b1) | (halt ? 0x40 : 0) | (carry ? 0x80 : 0);
             }
-            return 0;
+            return 0xFF;
         }
         
-        public void wb(int addr, int value){
-            switch(bank){
+        public void wb(int value){
+            switch(rtcRegister){
                 case 0x08: //Seconds
                     this.s = value & 0xFF;
                     break;
@@ -91,11 +92,13 @@ public class MBC3 implements MBC{
     public static final int ERAM_SIZE = 32768;  //32KB eram
     private int[] eram = new int[ERAM_SIZE];    //External Cartridge RAM
     
-    private RTC clock = new RTC();
+    private RTC rtc = new RTC();
     private int rombank = 1;
     private int rambank = 0;
     private boolean ramEnabled = false;
+    private boolean rtcEnabled = false;
     private boolean rtcReadEnabled = false;
+    private boolean rtcLatchNext = false;
     
     private Cartridge cart;
     
@@ -105,9 +108,12 @@ public class MBC3 implements MBC{
     
     public void Reset(){
         Arrays.fill(eram, 0);
-        clock.Reset();
+        rtc.Reset();
         
         ramEnabled = false;
+        rtcLatchNext = false;
+        rtcReadEnabled = false;
+        rtcEnabled = false;
         
         rambank = 0;
         rombank = 1;
@@ -133,15 +139,14 @@ public class MBC3 implements MBC{
             //Cartridge ROM (switchable) (rom bank 1)
             if(cart == null)
                 return 0;
-            return cart.read((romoff + (addr&0x3FFF)));
+            return cart.read(romoff + (addr - 0x4000));
         }
         else if(in(addr, 0xA000, 0xBFFF)){
             //External cartridge RAM OR RTC based on the mode
-            if(this.rtcReadEnabled){
-                //Read from RTC
-                clock.rb(addr);
-            }else{
-                return eram[ramoff + (addr&0x1FFF)]; //eram[ramoffs+(addr&0x1FFF)];
+            if(!rtcReadEnabled && ramEnabled){
+                return eram[ramoff + (addr - 0xA000)]; 
+            }else if(isRtcOn()){
+                return rtc.rb();
             }
         }
         return 0;
@@ -157,10 +162,11 @@ public class MBC3 implements MBC{
         if(in(addr, 0xA000, 0xBFFF)){
             //External cartridge RAM or RTC registers
             if(this.rtcReadEnabled){
-                clock.wb(addr, value);
+                if(isRtcOn())
+                    rtc.wb(value);
             }
-            else{
-                eram[ramoff + (addr&0x1FFF)] = value; //eram[ramoffs+(addr&0x1FFF)];
+            else if(ramEnabled){
+                eram[ramoff + (addr - 0xA000)] = value; //eram[ramoffs+(addr&0x1FFF)];
             }
         }
     }
@@ -169,15 +175,17 @@ public class MBC3 implements MBC{
         //Ram and timer enable
         if(addr >= 0 && addr <= 0x1FFF){
             //A value of 0x0A will enable reading and writing to ram and to the RTC, 00 will diable both
-            ramEnabled = (value & 0x0A) == 0x0A;
+            ramEnabled = (cart.info.ramSizeClass != RomInfo.RamSizeClass.NONE) && (value & 0x0F) == 0x0A;
+            rtcEnabled = (value & 0x0F) == 0x0A;
         }
         //Rom bank number
         else if(addr >= 0x2000 && addr <= 0x3FFF){
-            value &= 0xFF;
+            value &= 0x7F;
             if(value <= 0)
                 value = 1;
             
             rombank = value;
+            rombank &= (cart.info.romBanks - 1);
         }
         //Ram bank number - or - RTC select register
         else if(addr >= 0x4000 && addr <= 0x5FFF){
@@ -188,22 +196,33 @@ public class MBC3 implements MBC{
                 //Map rombank to address 0xA000 to 0xBFFF
                 this.rtcReadEnabled = false;
                 this.rambank = value;
+                this.rambank &= (cart.info.ramBanks - 1);
             }else if(value >= 0x08 && value <= 0x0C){
                 //Map RTC register to address 0xA000 to 0xBFFF
                 this.rtcReadEnabled = true;
-                this.clock.bank = value;
+                this.rtc.rtcRegister = value;
             }
         }
         //Latch clock data
         else if(addr >= 0x6000 && addr <= 0x7FFF){
             //Writing a 0 then a 1 to this register the current time becomes latched to the RTC register
             //Latched data will not change until latched again
-            if((value & 0xFF) == 1){
-                clock.LatchCurrent();
+            if(this.rtcLatchNext && (value & 0xFF) == 1){
+                rtc.LatchCurrent();
+                rtcLatchNext = false;
             }
+            this.rtcLatchNext = (value == 0x00);
         }
     }
 
+    /**
+     * Is the rtc enabled
+     * @return 
+     */
+    public boolean isRtcOn(){
+        return rtcEnabled;
+    }
+    
     /**
      * Get the offset value to use for ram access
      * @return 
