@@ -111,10 +111,14 @@ public class TileViewer extends JFrame{
         this.drawPanel = center;
         center.draw = (g2) -> {
             g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
-            int min = Math.min(center.getWidth(), center.getHeight());
             g2.setColor(this.getBackground());
-            g2.fillRect(0, 0, this.getWidth(), this.getHeight());
-            g2.drawImage(bmp.GetImage(), 0, 0, min, min, null);
+            g2.fillRect(0, 0, center.getWidth(), center.getHeight());
+            
+            //Always center the image and make sure it maintains aspect ratio
+            int min = Math.min(center.getWidth(), center.getHeight());
+            int x = (center.getWidth() - min) >> 1;
+            int y = (center.getHeight() - min) >> 1;
+            g2.drawImage(bmp.GetImage(), x, y, min, min, null);
         };
         
         JButton refresh = new JButton("Refresh");

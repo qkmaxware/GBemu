@@ -71,7 +71,7 @@ public class Gpu implements IMemory{
     private int gpumode = 2;
     private int clock = 0;
     
-    public boolean windowon = true;
+    public boolean windowon = false;
     public boolean lcdon = false;
     public boolean largeobj = false;
     public boolean objon = false;
@@ -154,12 +154,11 @@ public class Gpu implements IMemory{
         int[] scanrow = new int[160];
         
         if(bgon){
-            renderTiles(scanrow);
-            //drawBackgroundLine(this.curline, scanrow);
+            renderBackgroundLine(this.curline, scanrow);
         }
         
         if(objon){
-            renderSprites(scanrow);
+            renderSpriteLine(this.curline, scanrow);
         }
     }
     
@@ -176,123 +175,143 @@ public class Gpu implements IMemory{
     }
     
     public boolean IsBgTileAddressRegionUnsigned(){
-        return useSmallerTileStartAddress ? true : false;
+        return GetBgTileStartAddress() !=0 ? false : true;
     }
     
-    
-    
-    public void renderTiles(int[] scanrow){
-        int pixelY = curline;
-        int bgmapbase = GetBgMapStartAddress();
-        int bgtilebase = GetBgTileStartAddress();
-        int mapbase = (bgmapbase) + ((((curline + yscroll)&255)>>3)<<5);
+    public void renderBackgroundLine(int scanline, int[] scanrow){
+        //Scroll Y is the Y position of the background where to start drawing the viewing area from
+        //Scroll X is the X position of the background where to start drawing the viewing area from
+        //Window Y is the Y position of the viewing area to start drawing the window from
+        //Window X is the X position (-7) of the viewing area to start drawing the window from
+        int scrollY = this.yscroll;
+        int scrollX = this.xscroll;
+        int windowY = this.ywindow;
+        int windowX = this.xwindow;
+        int pixelY = scanline;
         
-        int y = (curline + yscroll) & 7;
-        int x = xscroll & 7;
-        int t = (xscroll >> 3) & 31;
-        
-        if(bgtilebase != 0){
-            int tile = vram[mapbase + t];
-            if(tile < 128)
-                tile = 256 + tile;
-            int[] tilerow = tilemap[tile][y];
-            
-            for(int pixelX = 0; pixelX < 160; pixelX++){
-                //Set the pixel
-                int colorNum = tilerow[x];
-                Color c = this.bgpallet[colorNum];
-                buffer.SetColor(pixelX, pixelY, c);
-                x++;
-                
-                //Set the scanrow (for sprite collision checking)
-                scanrow[pixelX] = colorNum;
-                
-                //If done with this bg tile, move onto the next
-                if(x == 8){
-                    t = (t+1) & 31;
-                    x = 0;
-                    tile = vram[mapbase + t];
-                    if(tile < 128)
-                        tile = 256 + tile;
-                    tilerow = tilemap[tile][y];
-                }
-            }
-            
-        }else{ 
-            int tile = vram[mapbase + t];
-            int[] tilerow = tilemap[tile][y];
-            
-            for(int pixelX = 0; pixelX < 160; pixelX++){
-                //Set the pixel
-                int colorNum = tilerow[x];
-                Color c = this.bgpallet[colorNum];
-                buffer.SetColor(pixelX, pixelY, c);
-                x++;
-                
-                //Set the scanrow (for sprite collision checking)
-                scanrow[pixelX] = colorNum;
-                
-                //If done with this bg tile, move onto the next
-                if(x == 8){
-                    t = (t+1) & 31;
-                    x = 0;
-                    tile = vram[mapbase + t];
-                    tilerow = tilemap[tile][y];
-                }
+        //Are we using a window?
+        boolean usewindow = false;
+        if(this.windowon){
+            if(windowY <= scanline){
+                usewindow = true;
             }
         }
-    }
-    
-    public void renderSprites(int[] scanrow){
-        int pixelY = curline;
         
-        int count = 0; //TODO max draw 10 sprites per line
+        //Get address space for tiles
+        int tileAddressBase = GetBgTileStartAddress();
+        boolean unsigned = IsBgTileAddressRegionUnsigned();
         
-        if(largeobj){
-            //TODO deal with double 8x16 sized sprites
-            
+        //What background memory
+        int backgroundAddressBase;
+        if(!usewindow){
+            backgroundAddressBase = GetBgMapStartAddress();
         }else{
-           for(int i = 0; i < this.oam_data.length; i++){   //40 Sprites
-               Sprite spr = this.oam_data_sorted[i];
-               
-               //Does the sprite land on the scanline
-               if(spr.y <= curline && (spr.y + 8) > curline){
-                    int[] tilerow;
-                   
-                    //If y flipped, grab the opposite horizontal row
-                    if(spr.yflip == Sprite.YOrientation.Flipped){
-                       tilerow = tilemap[spr.tile][7-(curline - spr.y)];
-                    }else{
-                       tilerow = tilemap[spr.tile][curline - spr.y];
-                    }
-                   
-                    //Select the color pallet to use
-                    Color[] pallet;
-                    if(spr.objPalette == Sprite.Palette.Zero){
-                       pallet = this.obj0pallet;
-                    }else{
-                        pallet = this.obj1pallet;
-                    }
-                   
-                   //Draw sprite
-                   for(int x = 0; x < 8; x++){
-                       int pixelX = (spr.x + x); //This is wrong - xscroll
-                       
-                       //Flip x coordinate if required
-                       int xpos = (spr.xflip == Sprite.XOrientation.Flipped) ? 7-x : x;
-                       int colorNum = tilerow[xpos];
-                       
-                       //Only if not WHITE (aka alpha) AND
-                       //Only if priority is above background or the background is white
-                       if(colorNum != 0 && (spr.priority == Sprite.Priority.AboveBackground || scanrow[pixelX] == 0)){
-                           Color c = pallet[colorNum];
-                           buffer.SetColor(pixelX, pixelY, c);
-                       }
-                   }
-                   
-               }
-           } 
+            backgroundAddressBase = GetWindowMapStartAddress();
         }
+        
+        //Which of the 32 vertical tiles am I drawing
+        int tileY;
+        if(!usewindow){
+            tileY = scrollY + scanline;
+        }else{
+            tileY = scanline - windowY;
+        }
+        
+        //Which of the 8 vertical pixels of this tile am I on
+        int rowY = ((tileY & 255) / 8) * 32;
+        
+        //Time to start drawing the scanline
+        for(int pixelX = 0; pixelX < LCD_WIDTH; pixelX++){
+            int xpos = pixelX + scrollX;
+            
+            //Translate into window space
+            if(usewindow){
+                if(pixelX >= windowX){
+                    xpos = pixelX - windowX;
+                }
+            }
+            
+            //Which of the 32 horizontal tiles does this pixel fall
+            int tileX = (xpos / 8) & 31;
+            
+            //Get the tile id number
+            int tileNum = vram[backgroundAddressBase + rowY + tileX];
+            if(!unsigned){
+                //Signed space, tile address != 0
+                if(tileNum < 128)
+                    tileNum = 256+tileNum;
+            }
+            
+            //Obtain the tile from the tilenumber
+            int[][] tile = tilemap[tileNum];
+            
+            //Get the pixel
+            int colorNum = tile[tileY % 8][xpos % 8];
+            Color c = this.bgpallet[colorNum];
+            
+            //Set the pixel in the buffer and in the scanline
+            scanrow[pixelX] = colorNum;
+            buffer.SetColor(pixelX, pixelY, c);
+            
+        }
+        
+    }
+    
+    public void renderSpriteLine(int scanline, int[] scanrow){
+        int curline = scanline;
+        int pixelY = curline;
+
+        int count = 0; //TODO max draw 10 sprites per line
+
+        int spritesize = (largeobj ? 16 : 8);
+
+        for(int i = 0; i < this.oam_data.length; i++){   //40 Sprites
+            Sprite spr = this.oam_data_sorted[i];
+
+            //Does the sprite land on the scanline
+            if(spr.y <= curline && (spr.y + spritesize) > curline){
+                 int[] tilerow;
+
+                 //For large sprites the last bit is always 0
+                 int tile = (largeobj ? spr.tile & (0xFE) : spr.tile);
+
+                 //If y flipped, grab the opposite horizontal row
+                 int yind;
+                 if(spr.yflip == Sprite.YOrientation.Flipped){
+                    yind = (spritesize - 1)-(curline - spr.y);
+                 }else{
+                    yind = curline - spr.y;
+                 }
+
+                 //Get the tile row
+                 //either the selected tile or the next tile for large sprites with y in the range (8-15)
+                 tilerow = tilemap[(yind > 7 ? tile + 1 : tile)][(yind > 7 ? yind - 8 : yind)];
+
+                 //Select the color pallet to use
+                 Color[] pallet;
+                 if(spr.objPalette == Sprite.Palette.Zero){
+                    pallet = this.obj0pallet;
+                 }else{
+                     pallet = this.obj1pallet;
+                 }
+
+                //Draw sprite
+                for(int x = 0; x < 8; x++){
+                    int pixelX = (spr.x + x); //This is wrong - xscroll
+
+                    //Flip x coordinate if required
+                    int xpos = (spr.xflip == Sprite.XOrientation.Flipped) ? 7-x : x;
+                    int colorNum = tilerow[xpos];
+
+                    //Only if not WHITE (aka alpha) AND
+                    //Only if priority is above background or the background is white
+                    if(colorNum != 0 && (spr.priority == Sprite.Priority.AboveBackground || scanrow[pixelX] == 0)){
+                        Color c = pallet[colorNum];
+                        buffer.SetColor(pixelX, pixelY, c);
+                    }
+                }
+            }
+         } 
     }
     
     public void flushBuffer(){
@@ -347,7 +366,7 @@ public class Gpu implements IMemory{
         ywindow = 0;
         xwindow = 0;
         
-        windowon = true;
+        windowon = false;
         lcdon = false;
         largeobj = false;
         objon = false;

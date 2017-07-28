@@ -14,7 +14,7 @@ import java.util.Arrays;
  */
 public class MBC2 implements MBC{
     
-    public static final int ERAM_SIZE = 512;    //512 bytes eram
+    public static final int ERAM_SIZE = 512;    //512x4 bits eram
     private int[] eram = new int[ERAM_SIZE];    //External Cartridge RAM
     
     private boolean ramEnabled = false;
@@ -56,25 +56,24 @@ public class MBC2 implements MBC{
             //Cartridge ROM (switchable) (rom bank 1)
             if(cart == null)
                 return 0;
-            return cart.read((romoff + (addr&0x3FFF)));
+            return cart.read((romoff + (addr - 0x4000)));
         }
         else if(in(addr, 0xA000, 0xBFFF)){
             //External cartridge RAM
-            return eram[ramoff + (addr&0x1FFF)]; //eram[ramoffs+(addr&0x1FFF)];
+            return eram[ramoff + (addr - 0xA000)]; //eram[ramoffs+(addr&0x1FFF)];
         }
         return 0;
     }
     
     public void wb(int addr, int value){
         //Create the appropriate offsets if required
-        int romoff = GetRomOffset(); //Rom bank 1
         int ramoff = GetRamOffset();
         
         this.hasOccurredWrite(addr, value);
         
         if(in(addr, 0xA000, 0xBFFF)){
-            //External cartridge RAM
-            eram[ramoff + (addr&0x1FFF)] = value; //eram[ramoffs+(addr&0x1FFF)];
+            //External cartridge RAM MBC2 only used 4 bits
+            eram[ramoff + (addr - 0xA000)] = value & 0xF; 
         }
     }
      
@@ -86,14 +85,13 @@ public class MBC2 implements MBC{
     public void hasOccurredWrite(int addr, int value){
         if(addr >= 0x0000 && addr <= 0x1FFF){
             //Enable RAM. Any Value with 0x0AH in the lower 4 bits enables ram, other values disable ram
-            ramEnabled = (value & 0x0A) == 0x0A;
+            ramEnabled = (value & 0x0F) == 0x0A;
         }else if(addr >= 0x2000 && addr <= 0x3FFF){
             //Last 4 bits of the value become the rom bank number
-            value &= 0xF;   //Mask to 4 bits
-            if(value <= 0)  //Minimum 1
-                value = 1;
-            
-            rombank = value;
+            rombank = value & 0x0F;
+            if(rombank == 0)
+                rombank++;
+            rombank &= (cart.info.romBanks - 1);
         }
     }
     
