@@ -5,13 +5,16 @@
  */
 package gameboy.game.controller;
 
-import gameboy.game.CartridgeAdapter;
-
 /**
  *
  * @author Colin Halseth
  */
 public interface MBC{
+   
+    /**
+     * Reset the state of the controller
+     */
+    public void Reset();
     
     /**
      * Get the offset value to use for ram access
@@ -25,7 +28,6 @@ public interface MBC{
      */
     public int GetRomOffset();
     
-    public void Reset();
     
     public int rb(int addr);
     

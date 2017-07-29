@@ -28,7 +28,7 @@ public class IniIO {
         for(String line : KeyValuePairs){
             String[] opts = line.split(":");
             if(opts.length >= 2)
-                io.options.put(opts[0], opts[1]);
+                io.options.put(opts[0].trim().toLowerCase(), opts[1].trim().toLowerCase());
         }
         return io;
     }
@@ -46,7 +46,7 @@ public class IniIO {
             for(String line : Files.readAllLines(Paths.get(f.getAbsolutePath()))){
                 String[] opts = line.split(":");
                 if(opts.length >= 2)
-                    ini.options.put(opts[0], opts[1].trim());
+                    ini.options.put(opts[0].trim().toLowerCase(), opts[1].trim().toLowerCase());
             }
             return ini;
         }catch(Exception e){
@@ -69,6 +69,7 @@ public class IniIO {
     }
     
     public boolean isSet(String prop){
+        prop = prop.toLowerCase();
         if(this.options.containsKey(prop)){
             return Boolean.parseBoolean(this.options.get(prop));
         }
@@ -76,10 +77,27 @@ public class IniIO {
     }
     
     public String getString(String prop){
+        prop = prop.toLowerCase();
         if(this.options.containsKey(prop)){
             return String.valueOf(this.options.get(prop));
         }
         return null;
+    }
+    
+    public Integer getInt(String prop){
+        prop = prop.toLowerCase();
+        if(this.options.containsKey(prop)){
+            return Integer.parseInt(this.options.get(prop));
+        }
+        return 0;
+    }
+    
+    public boolean exists(String prop){
+        prop = prop.toLowerCase();
+        if(this.options.containsKey(prop)){
+            return true;
+        }
+        return false;
     }
     
     public static void write(IniIO settings, String filename){

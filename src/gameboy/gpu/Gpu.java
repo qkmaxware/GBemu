@@ -8,6 +8,7 @@ package gameboy.gpu;
 import gameboy.IMemory;
 import gameboy.Listener;
 import gameboy.MemoryMap;
+import gameboy.cpu.Cpu;
 import java.awt.Color;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -108,7 +109,7 @@ public class Gpu implements IMemory{
                     //end of hblank, for last scanline render screen
                     if(curline == 143){
                         gpumode = Gpu.GPU_VBLANK;
-                        mmu.i_flags |= 1;
+                        mmu.i_flags |= 1; //Fire vblank interrupt
                         flushBuffer();
                     }else{
                         gpumode = Gpu.GPU_SCANLINEOAM;
@@ -405,7 +406,6 @@ public class Gpu implements IMemory{
             sx = 1 << (7 - x);
             tilemap[tile][y][x] = ((vram[saddr] & sx) != 0 ? 1 : 0) | ((vram[saddr + 1] & sx) != 0 ? 2 : 0);
         }
-        
     }
     
     protected void updateoam(int addr, int value) {

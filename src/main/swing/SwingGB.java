@@ -26,11 +26,13 @@ public class SwingGB extends JFrame{
     private ConcurrentLinkedQueue<Action> stepListeners = new ConcurrentLinkedQueue<Action>();
     private ConcurrentLinkedQueue<Action> onetimeStepListeners = new ConcurrentLinkedQueue<Action>();
     
+    private RenderPanel panel;
+    
     public SwingGB(boolean autoplay){
         super();
         
         //Create the render panel
-        RenderPanel panel = new RenderPanel(this.gb.gpu.canvas);
+        panel = new RenderPanel(this.gb.gpu.canvas);
         panel.setPreferredSize(new Dimension(166, 144)); //Same size as GB canvas
         this.add(panel);
         this.pack();
@@ -74,6 +76,15 @@ public class SwingGB extends JFrame{
         //If told to autoplay, then play 
         if(autoplay)
             thread.playThread();
+    }
+    
+    public void setRenderSize(int multiple){
+        setRenderSize(166*multiple, 144*multiple);
+    }
+    
+    public void setRenderSize(int w, int h){
+        panel.setPreferredSize(new Dimension(w, h));
+        this.pack();
     }
     
     public void Play(){

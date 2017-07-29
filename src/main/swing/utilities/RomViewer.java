@@ -32,7 +32,7 @@ public class RomViewer extends JFrame{
         
         JTextArea text = new JTextArea();
         text.setEditable(false);
-        text.setText(cart.info.toString());
+        text.setText(cart.header.toString());
         content.add(new JScrollPane(text), BorderLayout.CENTER);
         
         JPanel pic = new JPanel(){

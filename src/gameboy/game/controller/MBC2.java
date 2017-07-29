@@ -14,107 +14,90 @@ import java.util.Arrays;
  */
 public class MBC2 implements MBC{
     
-    public static final int ERAM_SIZE = 512;    //512x4 bits eram
-    private int[] eram = new int[ERAM_SIZE];    //External Cartridge RAM
+    private Cartridge cart;
     
+    private int rombank = 1;
     private boolean ramEnabled = false;
     
-    private int rambank = 0;
-    private int rombank = 1;
- 
-    private Cartridge cart;
+    public static final int ERAM_SIZE = 512;
+    private int[] eram = new int[ERAM_SIZE];
     
     public MBC2(Cartridge cart){
         this.cart = cart;
     }
-    
-     public void Reset(){
-        Arrays.fill(eram, 0);
-        
+
+    @Override
+    public void Reset() {
+        rombank = 1;
         ramEnabled = false;
         
-        rambank = 0;
-        rombank = 1;
+        Arrays.fill(eram, 0);
     }
     
-     private static boolean in(int x, int lower, int upper) {
-        return lower <= x && x <= upper;
+    @Override
+    public int GetRamOffset() {
+        return 0x2000;
     }
-    
-    public int rb(int addr){
-        //Create the appropriate offsets if required
-        int romoff = GetRomOffset(); //Rom bank 1
-        int ramoff = 0;
-        
-        if(in(addr, 0, 0x3FFF)){
-            //Cartridge ROM (fixed) (rom bank 0)
-            if(cart == null)
-                return 0;
+
+    @Override
+    public int GetRomOffset() {
+        return rombank * 0x4000;
+    }
+
+    @Override
+    public int rb(int addr) {
+        //ROM BANK 0 (Read Only)
+        if(addr >= 0x0000 && addr <= 0x3FFF){
             return cart.read(addr);
         }
-        else if(in(addr, 0x4000, 0x7FFF)){
-            //Cartridge ROM (switchable) (rom bank 1)
-            if(cart == null)
-                return 0;
-            return cart.read((romoff + (addr - 0x4000)));
+        //ROM BANK 1-F (Read Only)
+        else if(addr >= 0x4000 && addr <= 0x7FFF){
+            return cart.read((addr - 0x4000) + GetRomOffset());
         }
-        else if(in(addr, 0xA000, 0xBFFF)){
-            //External cartridge RAM
-            return eram[ramoff + (addr - 0xA000)]; //eram[ramoffs+(addr&0x1FFF)];
-        }
+        //512x4bit RAM (RW)
+        else if(addr >= 0xA000 && addr <= 0xA1FF){
+            if(this.ramEnabled)
+                return this.eram[addr - 0xA000];
+            else
+                return 0xFF;
+        } 
+        
         return 0;
     }
-    
-    public void wb(int addr, int value){
-        //Create the appropriate offsets if required
-        int ramoff = 0;
-        
-        this.hasOccurredWrite(addr, value);
-        
-        if(in(addr, 0xA000, 0xBFFF)){
-            //External cartridge RAM MBC2 only used 4 bits
-            eram[ramoff + (addr - 0xA000)] = value & 0xF; 
-        }
-    }
-     
-    /**
-     * If a write has occurred to the cartridge, check if an action is performed in accordance with MBC rules
-     * @param addr
-     * @param value 
-     */
-    public void hasOccurredWrite(int addr, int value){
+
+    @Override
+    public void wb(int addr, int value) {
+        //RAM ENABLE (Write Only)
         if(addr >= 0x0000 && addr <= 0x1FFF){
-            //Enable RAM. Any Value with 0x0AH in the lower 4 bits enables ram, other values disable ram
-            ramEnabled = (value & 0x0F) == 0x0A;
-        }else if(addr >= 0x2000 && addr <= 0x3FFF){
-            //Last 4 bits of the value become the rom bank number
-            rombank = value & 0x0F;
-            if(rombank == 0)
-                rombank++;
-            rombank &= (cart.info.romBanks - 1);
+            //Least significant bit of the upper address byte must be 0 to enable/disable ram cart
+            if((addr & 0x100) == 0){
+                ramEnabled = ((value & 0x0F) == 0x0A);
+            }else{
+                System.out.println("Not able to enable/disable ram unless theres a 0 in the least significant bit of the upper address.");
+            }
         }
-    }
-    
-    public boolean IsRamEnabled(){
-        return this.ramEnabled;
-    }
-    
-    /**
-     * Get the offset value to use for ram access
-     * @return 
-     */
-    @Override
-    public int GetRamOffset(){
-        return rambank * 0x2000;
-    }
-    
-    /**
-     * Get the offset value to use for rom access
-     * @return 
-     */
-    @Override
-    public int GetRomOffset(){
-        return rombank * 0x4000;
+        //ROM BANK NUMBER (Write Only)
+        else if(addr >= 0x2000 && addr <= 0x3FFF){
+            //Least significant bit of the upper address byte must be 1 to select a rom bank
+            if((addr & 0x100) != 0){
+                this.rombank = value & 0x0F;
+                this.rombank &= (this.cart.header.romClass.banks - 1);
+                if(this.rombank == 0)
+                    this.rombank = 1;
+            }else{
+                System.out.println("Not able to set the rombank without a 1 in the least significant bit of the upper address.");
+            }
+        }
+        //512x4bit RAM (RW)
+        else if(addr >= 0xA000 && addr <= 0xA1FF){
+            if(ramEnabled){
+                this.eram[addr - 0xA000] = value & 0x0F;
+            }
+            else{
+                System.out.println("Writing to disabled ram");
+            }
+        }
+        
     }
     
 }

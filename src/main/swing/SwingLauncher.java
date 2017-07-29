@@ -14,6 +14,7 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.io.File;
 import java.io.FilenameFilter;
+import java.util.LinkedList;
 import javax.swing.BoxLayout;
 import javax.swing.DefaultListCellRenderer;
 import javax.swing.JButton;
@@ -38,6 +39,8 @@ public class SwingLauncher extends JFrame{
     
     public boolean autoPlay = false;
     public boolean enableDebugger = true;
+    public boolean enableTrace = false;
+    public int[] launchSize = new int[]{166,144};
     
     public SwingLauncher(){}
     
@@ -73,14 +76,13 @@ public class SwingLauncher extends JFrame{
                 if (rowindex < 0)
                     return;
                 if(e.isPopupTrigger()){
-                    System.out.println("olo");
                     JPopupMenu menu = new JPopupMenu();
                     JMenuItem ll = new JMenuItem("Launch");
                     ll.addActionListener((evt) -> {
                         Cartridge cart = carts[rowindex];
                         StartEmulator(cart); 
                     });
-                    JMenuItem info = new JMenuItem("Info");
+                    JMenuItem info = new JMenuItem("Cart Info");
                     info.addActionListener((evt) -> {
                         Cartridge cart = carts[rowindex];
                         RomViewer viewer = new RomViewer(cart);
@@ -103,6 +105,9 @@ public class SwingLauncher extends JFrame{
         
         JButton launch = new JButton("Launch");
         launch.addActionListener((evt) -> {
+            if(body.getSelectedIndex() < 0)
+                return;
+            
             Cartridge cart = carts[body.getSelectedIndex()];
             StartEmulator(cart);             
         });
@@ -119,9 +124,13 @@ public class SwingLauncher extends JFrame{
     public void StartEmulator(Cartridge cart){
         SwingGB gb = new SwingGB(autoPlay);
         gb.GetGameboy().LoadCartridge(cart);
-        gb.setTitle("Playing: "+cart.info.title);
+        
+        gb.GetGameboy().cpu.debugMode = enableTrace;
+        gb.setRenderSize(this.launchSize[0], this.launchSize[1]);
+        
+        gb.setTitle("Playing: "+cart.header.title);
         gb.setVisible(true);
-
+        
         if(enableDebugger){
             Debugger debugger = new Debugger(gb);
             debugger.setVisible(true);
@@ -129,25 +138,30 @@ public class SwingLauncher extends JFrame{
     }
     
     public Cartridge[] GetLocalCartridges(){
-        File dir = new File(this.romLocation);
-        if(!dir.exists())
-            return new Cartridge[0];
+        String[] locations = romLocation.split(",");
         
-        File[] files = dir.listFiles(new FilenameFilter() {
-            @Override
-            public boolean accept(File dir, String name) {
-                return name.endsWith(".gb");
-            }
-        });
+        LinkedList<Cartridge> carts = new LinkedList<Cartridge>();
+        
+        for(String loc : locations){
+            File dir = new File(loc.trim());
+            if(!dir.exists())
+                break;
 
-        Cartridge[] roms = new Cartridge[files.length];
-        
-        int i = 0;
-        for (File gbfile : files) {
-            Cartridge rom = CartridgeFactory.Load(gbfile.getAbsolutePath());
-            roms[i] = rom;
-            i++;
+            File[] files = dir.listFiles(new FilenameFilter() {
+                @Override
+                public boolean accept(File dir, String name) {
+                    return name.endsWith(".gb");
+                }
+            });
+            
+            for (File gbfile : files) {
+                Cartridge rom = CartridgeFactory.Load(gbfile.getAbsolutePath());
+                carts.add(rom);
+            }
         }
+
+        Cartridge[] roms = new Cartridge[carts.size()];
+        roms = carts.toArray(roms);
         
         return roms;
     }

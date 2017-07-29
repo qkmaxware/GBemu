@@ -110,18 +110,18 @@ public class MBC1 implements MBC{
                 rombank++;
             }
             
-            rombank &= (cart.info.romBanks - 1);
+            rombank &= (cart.header.romClass.banks - 1);
             
         }else if(addr >= 0x4000 && addr <= 0x5FFF){
             //This 2 bit register can be used to select a ram bank in the range 00-03 or specify the upper 2 bits of the bank number
             //This behavior depends on the ROM/RAM mode select
             if(!ramSelected){
                 rombank = (rombank & 0x1F) | ((value & 3) << 5);   //Set upper 2 bits
-                rombank &= (cart.info.romBanks - 1);
+                rombank &= (cart.header.romClass.banks - 1);
             
             }else{
                 rambank = value & 3;          //Set rambank number
-                rambank &= (cart.info.ramBanks - 1);
+                rambank &= (cart.header.eramClass.banks - 1);
             }
         }
         else if(addr >= 6000 && addr <= 0x7FFF){

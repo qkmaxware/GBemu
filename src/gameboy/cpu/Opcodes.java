@@ -35,7 +35,7 @@ public class Opcodes {
             if(map[i] == null){
                 count.add(i);
                 Op XX = new Op(i, "XX", null, () -> {
-                    System.out.println("Unimplemented opcode called at "+(reg.pc() - 1)+" with opcode "+mmu.rb((reg.pc() - 1)));
+                    System.out.println( "Unimplemented opcode called at "+(reg.pc() - 1)+" with opcode "+mmu.rb((reg.pc() - 1)));
                     clock.m(1);
                     clock.t(4);
                 });
@@ -44,7 +44,7 @@ public class Opcodes {
             if(cbmap[i] == null){
                 ccount.add(i);
                 Op XX = new Op(i, "XX", null, () -> {
-                    System.out.println("Unimplemented cb-opcode called at "+(reg.pc() - 1)+" with opcode CB:"+mmu.rb((reg.pc() - 1)));
+                    System.out.println("Unimplemented cb-opcode called at "+(reg.pc() - 1)+" with opcode "+mmu.rb((reg.pc() - 1)));
                     clock.m(1);
                     clock.t(4);
                 });
@@ -52,30 +52,31 @@ public class Opcodes {
             }
         }
         
-        System.out.println(count.size()+" base opcodes undefined");
-        System.out.println(count.toString());
-        System.out.println(ccount.size()+" CB opcodes undefined");
-        System.out.println(ccount.toString());
+        System.out.println(count.size()+" base opcodes undefined and "+ccount.size()+" CB opcodes undefined");
     }
     
     public boolean isValidOpcode(int opcode){
         if(this.map == null){
             return false;
         }
-            //throw new RuntimeException("Opcodes have not been initialized");
         if(opcode < 0 || opcode >= this.map.length){
-            //throw new RuntimeException("Opcode ("+opcode+")is not valid ");
             return false;
         }
-        //if(this.map[opcode]] == XX){
-            //System.out.println("Opcode "+opcode+" is not implemented");
-        //}
         return true;
     }
     
     public Op Fetch(int opcode){
-        if(!isValidOpcode(opcode))
+        if(!isValidOpcode(opcode)){
             throw new RuntimeException("Opcode is not valid at: "+reg.pc());
+        }
+        Op op = this.map[opcode];
+        return op; 
+    }
+    
+    public Op Decode(int opcode){
+        if(!isValidOpcode(opcode)){
+            return null;
+        }
         Op op = this.map[opcode];
         return op; 
     }
@@ -83,20 +84,6 @@ public class Opcodes {
     //--------------------------------------------------------------------------
     // Helper functions
     //--------------------------------------------------------------------------
-    
-    private void rsv(){
-        cpp.a(reg.a()); cpp.b(reg.b());
-        cpp.c(reg.c()); cpp.d(reg.d());
-        cpp.e(reg.e()); cpp.f(reg.f());
-        cpp.h(reg.h()); cpp.l(reg.l());
-    }
-    
-    private void rrs(){
-        reg.a(cpp.a()); reg.b(cpp.b());
-        reg.c(cpp.c()); reg.d(cpp.d());
-        reg.e(cpp.e()); reg.f(cpp.f());
-        reg.h(cpp.h()); reg.l(cpp.l());
-    }
     
     private boolean isHalfCarry(int a, int b){
         //Borrow
@@ -3071,7 +3058,6 @@ public class Opcodes {
     ///
     
     private void rst(int loc){
-        rsv(); //TODO //Save registry to backup
         push(reg.pc());
         reg.pc(loc);
         

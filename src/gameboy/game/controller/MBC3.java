@@ -6,7 +6,7 @@
 package gameboy.game.controller;
 
 import gameboy.game.Cartridge;
-import gameboy.game.RomInfo;
+import gameboy.game.header.RomInfo;
 import java.util.Arrays;
 import java.util.Calendar;
 
@@ -175,7 +175,7 @@ public class MBC3 implements MBC{
         //Ram and timer enable
         if(addr >= 0 && addr <= 0x1FFF){
             //A value of 0x0A will enable reading and writing to ram and to the RTC, 00 will diable both
-            ramEnabled = (cart.info.ramSizeClass != RomInfo.RamSizeClass.NONE) && (value & 0x0F) == 0x0A;
+            ramEnabled = cart.HasRam() && (value & 0x0F) == 0x0A;
             rtcEnabled = (value & 0x0F) == 0x0A;
         }
         //Rom bank number
@@ -185,7 +185,7 @@ public class MBC3 implements MBC{
                 value = 1;
             
             rombank = value;
-            rombank &= (cart.info.romBanks - 1);
+            rombank &= (cart.header.romClass.banks - 1);
         }
         //Ram bank number - or - RTC select register
         else if(addr >= 0x4000 && addr <= 0x5FFF){
@@ -196,7 +196,7 @@ public class MBC3 implements MBC{
                 //Map rombank to address 0xA000 to 0xBFFF
                 this.rtcReadEnabled = false;
                 this.rambank = value;
-                this.rambank &= (cart.info.ramBanks - 1);
+                this.rambank &= (cart.header.eramClass.banks - 1);
             }else if(value >= 0x08 && value <= 0x0C){
                 //Map RTC register to address 0xA000 to 0xBFFF
                 this.rtcReadEnabled = true;

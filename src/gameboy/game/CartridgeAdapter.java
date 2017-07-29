@@ -21,7 +21,7 @@ public class CartridgeAdapter implements IMemory{
     public void LoadCart(Cartridge cart){
         this.cart = cart;
         
-        switch(cart.info.cartType){
+        switch(cart.header.cartType.mbc){
             case MBC1:
                 controller = (MBC) new MBC1(cart);
                 break;

@@ -5,6 +5,9 @@
  */
 package gameboy.game;
 
+import gameboy.game.header.CgbSupport;
+import gameboy.game.header.RomInfo;
+import gameboy.game.header.SgbSupport;
 import java.io.File;
 
 /**
@@ -14,30 +17,28 @@ import java.io.File;
 public class Cartridge{
 
     public File source;
-    public final RomInfo info;
+    public final RomInfo header;
     private int[] rom;
     
     protected Cartridge(int[] rom){
-        this.info = new RomInfo(rom);
+        this.header = new RomInfo(rom);
         this.rom = rom;
     }
     
     public boolean supportsSGB(){
-        return info.sgb == RomInfo.SgbSupport.SGB;
+        return header.sgb == SgbSupport.SGB;
     }
     
     public boolean supportsCGB(){
-        return (info.cgb == RomInfo.CgbSupport.CbgAllowed || info.cgb == RomInfo.CgbSupport.CbgRequired);
+        return (header.cgb == CgbSupport.CbgAllowed || header.cgb == CgbSupport.CbgRequired);
     }
     
     public boolean HasRam(){
-        return info.ramSizeClass != RomInfo.RamSizeClass.Unknown && 
-                info.ramSizeClass != RomInfo.RamSizeClass.NONE &&
-                info.ramBanks != 0;
+        return header.cartType.hasRam;
     }
     
     public String toString(){
-        return (source == null ? info.title : source.getName());
+        return (source == null ? header.title : source.getName());
     }
     
     public int read(int addr){

@@ -486,7 +486,7 @@ public class Debugger extends JFrame{
                     row.set(1, String.format("0x%04X", mmu.rb(i)));
                     break;
                 case 2:
-                    Op op = this.cpu.opcodes.Fetch(mmu.rb(i));
+                    Op op = this.cpu.opcodes.Decode(mmu.rb(i));
                     if(op == null){
                         row.set(1, ""+mmu.rb(i));
                         break;

@@ -18,17 +18,19 @@ public class Cpu {
     public final Registry reg = new Registry();
     public final Clock clock = new Clock();
     public final Registry cpp = new Registry();
-    
-    private MemoryMap mmu;
-    
     public final Opcodes opcodes;
+    public final MemoryMap mmu;
     
-    public final ConcurrentLinkedDeque<String> recentOps = new ConcurrentLinkedDeque<String>();         
-
+    public final ConcurrentLinkedDeque<String> recentOps = new ConcurrentLinkedDeque<String>();
+    
+    public boolean debugMode = true;
+    private CpuTrace trace = new CpuTrace();
     
     public Cpu(MemoryMap mmu){
         this.mmu = mmu;
         opcodes = new Opcodes(this, mmu);
+        
+        trace.enable(true);
     }
 
     private void LastOp(String value){
@@ -124,29 +126,38 @@ public class Cpu {
             }
             if((fired & 0b10) != 0){
                 //LCD stat
-                //mmu.i_flags &= 0xFD;
-                //opcodes.RST_48h.Invoke();
+                mmu.i_flags &= 0xFD;
+                opcodes.RST_48h.Invoke();
             }
             if((fired & 0b100) != 0){
                 //Timer
-                //mmu.i_flags &= 0xFB;
-                //opcodes.RST_50h.Invoke();
+                mmu.i_flags &= 0xFB;
+                opcodes.RST_50h.Invoke();
             }
             if((fired & 0b1000) != 0){
                 //Serial
-                //mmu.i_flags &= 0xF7;
-                //opcodes.RST_58h.Invoke();
+                mmu.i_flags &= 0xF7;
+                opcodes.RST_58h.Invoke();
             }
             if((fired & 0b10000) != 0){
                 //Joypad press
-                //mmu.i_flags &= EF;
-                //opcodes.RST_60h.Invoke();
+                mmu.i_flags &= 0xEF;
+                opcodes.RST_60h.Invoke();
             }
         }
         
         //Increment the clock in case interrupt has fired
         clock.Accept();
         
+        //Fire a trace if able
+        if(this.debugMode){
+            this.trace.write(this.toString());
+        }
+        
         return deltaM;
+    }
+    
+    public String toString(){
+        return String.format("%1$-25s",this.recentOps.getLast()) +  " -> " + this.reg.toString();
     }
 }
