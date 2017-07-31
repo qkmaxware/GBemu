@@ -3129,8 +3129,6 @@ public class Opcodes {
         rst(0x60);
     });
     
-    //PAGE 117
-    
     ///
     // Returns
     ///
@@ -3168,7 +3166,7 @@ public class Opcodes {
     });
     
     //Return if C flag is reset
-    Op RET_CZ = new Op(0xD0, "RET CZ", map, () -> {
+    Op RET_CZ = new Op(0xD0, "RET NC", map, () -> {
         if(!reg.carry()){
             reg.pc(pop());
             clock.m(3);

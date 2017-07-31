@@ -15,6 +15,8 @@ import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.GridLayout;
 import java.awt.RenderingHints;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import javax.swing.BorderFactory;
 import javax.swing.ButtonGroup;
 import javax.swing.JButton;
@@ -44,7 +46,7 @@ public class TileViewer extends JFrame{
     private Gpu gpu;
     private int selected =0;
     private Bitmap bmp = new Bitmap(8,8);
-    private Bitmap all = new Bitmap(15*8, 17*8); //255 Tiles per base 0x0000, 0x0800
+    private Bitmap all = new Bitmap(16*8, 16*8); //255 Tiles per base 0x0000, 0x0800
     private int base = 0;
     
     private JPanel drawPanel;
@@ -142,6 +144,21 @@ public class TileViewer extends JFrame{
             g2.drawImage(all.GetImage(), 0, 0, allpanel.getWidth(), allpanel.getHeight(), null);
         };
         
+        allpanel.addMouseListener(new MouseAdapter(){
+            @Override
+            public void mousePressed(MouseEvent evt){
+                float sx = (float)(evt.getPoint().x) / allpanel.getWidth();
+                float sy = (float)(evt.getPoint().y) / allpanel.getHeight();
+
+                int cx = Math.max(Math.min((int)(sx * (all.GetWidth() >> 3)), (all.GetWidth() >> 3)), 0);
+                int cy = Math.max(Math.min((int)(sy * (all.GetHeight() >> 3)), (all.GetHeight() >> 3)), 0);
+                
+                int tile = (cy * (all.GetWidth() >> 3) + cx) + (base * 128);
+                selected = tile;
+                Refresh();
+            }
+        });
+        
         JRadioButton b8000 = new JRadioButton("0x8000");
         JRadioButton b8800 = new JRadioButton("0x8800");
         ButtonGroup group = new ButtonGroup();
@@ -162,6 +179,7 @@ public class TileViewer extends JFrame{
     }
     
     public void Refresh(){
+        this.selected = Math.max(Math.min(this.gpu.tilemap.length, this.selected), 0);
         tileid.setText(String.valueOf(this.selected));
         
         //Refresh this specific tyle
@@ -191,7 +209,7 @@ public class TileViewer extends JFrame{
         //Refresh all tiles map
         int lx = 0; int ly = 0;
         for(int i = 0; i < 255; i++){
-            int[][] tiledata = gpu.tilemap[base*255 + i];
+            int[][] tiledata = gpu.tilemap[base*128 + i];
             for(int y = 0; y < 8; y++){
                 for(int x = 0; x < 8; x++){
                     int drawX = lx+x;
@@ -216,7 +234,7 @@ public class TileViewer extends JFrame{
                 }
             }
             lx+=8;
-            if(lx >= 15*8) {
+            if(lx >= all.GetWidth()) {
                 lx = 0;
                 ly+=8;
             }

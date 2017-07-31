@@ -39,6 +39,7 @@ public class Gameboy {
         timer = new Timer();
         adapter = new CartridgeAdapter();
         SerialConnection sysio = new SerialConnection(new InputStreamReader(System.in), new OutputStreamWriter(System.out));
+        sysio.EnableWrite(false);
         
         mmu.Set(MemoryMap.INTERNAL_RAM, onboard);
         mmu.Set(MemoryMap.ZRAM, onboard);

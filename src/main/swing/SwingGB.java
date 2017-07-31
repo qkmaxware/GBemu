@@ -22,6 +22,7 @@ public class SwingGB extends JFrame{
     
     private Gameboy gb = new Gameboy();
     private ControllerThread thread;
+    private FrameLimiter limiter = new FrameLimiter();
     
     private ConcurrentLinkedQueue<Action> stepListeners = new ConcurrentLinkedQueue<Action>();
     private ConcurrentLinkedQueue<Action> onetimeStepListeners = new ConcurrentLinkedQueue<Action>();
@@ -56,6 +57,7 @@ public class SwingGB extends JFrame{
         
         //Assign the event listeners
         gb.OnBufferReady(() -> {
+            limiter.waitUntil(); //Frame limiter
             panel.repaint();
         });
         
@@ -76,6 +78,12 @@ public class SwingGB extends JFrame{
         //If told to autoplay, then play 
         if(autoplay)
             thread.playThread();
+    }
+    
+    public void setFPS(int fps){
+        float secondsPerFrame = 1.0f/fps;
+        long millisecondsPerFrame = (long)(secondsPerFrame * 1000);
+        this.limiter.setLimit(millisecondsPerFrame);
     }
     
     public void setRenderSize(int multiple){

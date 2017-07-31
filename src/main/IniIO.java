@@ -44,6 +44,9 @@ public class IniIO {
         try{
             IniIO ini = new IniIO();
             for(String line : Files.readAllLines(Paths.get(f.getAbsolutePath()))){
+                if(line.startsWith("#") || !line.matches(".+:.+")){ 
+                    continue;
+                }
                 String[] opts = line.split(":");
                 if(opts.length >= 2)
                     ini.options.put(opts[0].trim().toLowerCase(), opts[1].trim().toLowerCase());
@@ -67,6 +70,36 @@ public class IniIO {
         
         return c;
     }
+   
+    public static IniIO readAndUpdate(String fname, IniIO updateTemplate){
+        IniIO n = IniIO.read(fname);
+        
+        try{
+            FileWriter writer = new FileWriter(fname, true);
+            
+            //If file did not exist, make the default file
+            if(n == DEFAULT){
+               for(String key : n.options.keySet()){
+                   writer.write(key+": "+n.options.get(key)+System.lineSeparator());
+               }    
+            }
+            
+            //Append any new ini options to the file
+            for(String key : updateTemplate.options.keySet()){
+                if(!n.options.containsKey(key)){
+                    n.options.put(key, updateTemplate.options.get(key));
+                    writer.write(key+": "+updateTemplate.options.get(key)+System.lineSeparator());  
+                }
+            }
+            
+            writer.close();
+        }catch(Exception e){
+            System.out.println("Failed to update ini");
+        }
+        
+        return n;
+    }
+    
     
     public boolean isSet(String prop){
         prop = prop.toLowerCase();
@@ -89,7 +122,7 @@ public class IniIO {
         if(this.options.containsKey(prop)){
             return Integer.parseInt(this.options.get(prop));
         }
-        return 0;
+        return -1;
     }
     
     public boolean exists(String prop){

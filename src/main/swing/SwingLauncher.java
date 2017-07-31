@@ -41,6 +41,7 @@ public class SwingLauncher extends JFrame{
     public boolean enableDebugger = true;
     public boolean enableTrace = false;
     public int[] launchSize = new int[]{166,144};
+    public int frameRateLimit = -1;
     
     public SwingLauncher(){}
     
@@ -126,6 +127,7 @@ public class SwingLauncher extends JFrame{
         gb.GetGameboy().LoadCartridge(cart);
         
         gb.GetGameboy().cpu.debugMode = enableTrace;
+        gb.setFPS(this.frameRateLimit);
         gb.setRenderSize(this.launchSize[0], this.launchSize[1]);
         
         gb.setTitle("Playing: "+cart.header.title);
@@ -139,13 +141,16 @@ public class SwingLauncher extends JFrame{
     
     public Cartridge[] GetLocalCartridges(){
         String[] locations = romLocation.split(",");
-        
+
         LinkedList<Cartridge> carts = new LinkedList<Cartridge>();
         
         for(String loc : locations){
-            File dir = new File(loc.trim());
-            if(!dir.exists())
-                break;
+            loc = loc.trim();
+            File dir = new File(loc);
+            if(!dir.exists()){
+                System.out.println("Invalid rom directory: "+loc);
+                continue;
+            }
 
             File[] files = dir.listFiles(new FilenameFilter() {
                 @Override

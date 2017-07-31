@@ -126,6 +126,8 @@ public class MemoryMap{
     }
     
     public void wb(int addr, int value){
+        value &= 0xFF;
+        
         if(in(addr, 0x0000, 0x3FFF)){
            //Rom Bank 0 -- Readonly
            ctrl[ROM_BANK_0].wb(addr, value);    //Read Only Skip

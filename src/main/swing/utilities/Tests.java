@@ -9,6 +9,7 @@ import gameboy.Gameboy;
 import gameboy.MemoryMap;
 import gameboy.cpu.Cpu;
 import gameboy.cpu.Op;
+import java.util.Arrays;
 import java.util.LinkedList;
 
 /**
@@ -21,13 +22,13 @@ public class Tests {
         Gameboy gb = new Gameboy();
         System.out.println("Running tests ... please wait.\n");
         
-        System.out.println("Testing Memory Access");
-        TestMemory(gb);
-        System.out.println("");
+        //System.out.println("Testing Memory Access");
+        //TestMemory(gb);
+        //System.out.println("");
         
-        System.out.println("Testing Registry Read/Write");
-        TestRegistry(gb);
-        System.out.println("");
+        //System.out.println("Testing Registry Read/Write");
+        //TestRegistry(gb);
+        //System.out.println("");
         
         System.out.println("Testing Opcodes");
         TestOpcodes(gb);
@@ -288,6 +289,20 @@ public class Tests {
         op.Invoke();
         if(gb.cpu.reg.a() != 8)
             failed.add(op);
+        gb.Reset();
+        
+        //0x27 DAA
+        op = cpu.opcodes.Fetch(0x27);
+        for(int a = 0; a <= 0xFF; a++){
+            gb.cpu.reg.clearFlags();
+            gb.cpu.reg.a(a);
+            op.Invoke();
+            int k = gb.cpu.reg.a();
+            
+            if(((k >> 4) & 0xF) > 9 || (k & 0xF) > 9){
+                System.out.println("Failed to convert "+a+" to BCD res: "+k);
+            }
+        }
         gb.Reset();
         
         //TODO remaining opcodes

@@ -12,10 +12,11 @@ import java.awt.Color;
  * @author Colin Halseth
  */
 public class ColourPallet {
+    
     public class ColourMap{
         public Color DARK = Color.BLACK;
         public Color MEDIUM = Color.DARK_GRAY;
-        public Color LIGHT = Color.GRAY;
+        public Color LIGHT = Color.LIGHT_GRAY;
         public Color WHITE = Color.WHITE; //White is alpha for sprites
     }
     

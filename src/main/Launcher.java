@@ -22,12 +22,13 @@ public class Launcher {
             "DEBUGGER: FALSE",
             "ROM FOLDER: ./roms/",
             "CPU TRACE: FALSE",
-            "RENDER SIZE: 1x"
+            "RENDER SIZE: 1x",
+            "ENABLE FRAME LIMIT: TRUE",
+            "FRAME RATE: 60"
         });
         
-        //Overwrite defaults and save the file if it doesn't exist
-        IniIO userConfig = IniIO.merge(IniIO.DEFAULT, IniIO.read("config.ini"));
-        IniIO.write(userConfig, "config.ini");
+        //Load user configs and update config file with missing or new DEFAULT attributes
+        IniIO userConfig = IniIO.readAndUpdate("config.ini", IniIO.DEFAULT);
         
         //Load in any command line parameters, overwrite user config if required
         
@@ -51,6 +52,7 @@ public class Launcher {
                 };
             }
         }
+        window.frameRateLimit = userConfig.isSet("ENABLE FRAME LIMIT") ? userConfig.getInt("FRAME RATE") : -1;
         
         //Invoke the gui on the Swing thread not the main thread
         SwingUtilities.invokeLater(() -> {

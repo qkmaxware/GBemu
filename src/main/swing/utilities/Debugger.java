@@ -18,7 +18,6 @@ import java.awt.Font;
 import java.awt.GridLayout;
 import java.awt.Point;
 import java.awt.Rectangle;
-import java.awt.Toolkit;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
@@ -442,6 +441,13 @@ public class Debugger extends JFrame{
             viewer.setVisible(true);
         });
         windows.add(show_spriteviewer);
+        
+        JMenuItem show_stackviewer = new JMenuItem("Stack Viewer");
+        show_stackviewer.addActionListener((evt) -> {
+            StackViewer viewer = new StackViewer(gb);
+            viewer.setVisible(true);
+        });
+        windows.add(show_stackviewer);
         
         //Finish config
         footer.add(displayMode);

@@ -8,7 +8,6 @@ package gameboy.gpu;
 import gameboy.IMemory;
 import gameboy.Listener;
 import gameboy.MemoryMap;
-import gameboy.cpu.Cpu;
 import java.awt.Color;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -100,6 +99,13 @@ public class Gpu implements IMemory{
     }
    
     public void Step(int step){
+        //If LCD is off, treat it as a perminent VBLANK
+        if(!lcdon){
+            curline = 0;
+            gpumode = Gpu.GPU_VBLANK;
+            return;
+        }
+        
         clock += step;  //Step is in m time not in cycles (t)
         
         switch(gpumode){
@@ -155,7 +161,10 @@ public class Gpu implements IMemory{
         int[] scanrow = new int[160];
         
         if(bgon){
-            renderBackgroundLine(this.curline, scanrow);
+            renderBackgroundLine(
+                this.curline, 
+                scanrow
+            );
         }
         
         if(objon){
@@ -300,6 +309,10 @@ public class Gpu implements IMemory{
                 for(int x = 0; x < 8; x++){
                     int pixelX = (spr.x + x); //This is wrong - xscroll
 
+                    //Pixel must be on the screen to be drawn
+                    if(!(pixelX >= 0 && pixelX < scanrow.length))
+                        continue;
+                    
                     //Flip x coordinate if required
                     int xpos = (spr.xflip == Sprite.XOrientation.Flipped) ? 7-x : x;
                     int colorNum = tilerow[xpos];
