@@ -119,27 +119,27 @@ public class Cpu {
             // Joypad Press     0x60            4   
             //----------------------------------------------
             
-            if((fired & 0x01) != 0){
+            if((fired & mmu.INTERRUPT_VBLANK) != 0){
                 //Vblank
                 mmu.i_flags &= 0xFE;
                 opcodes.RST_40h.Invoke();
             }
-            if((fired & 0b10) != 0){
-                //LCD stat
+            if((fired & mmu.INTERRUPT_LCDC) != 0){
+                //LCDC stat
                 mmu.i_flags &= 0xFD;
                 opcodes.RST_48h.Invoke();
             }
-            if((fired & 0b100) != 0){
+            if((fired & mmu.INTERRUPT_TIMEROVERFLOW) != 0){
                 //Timer
                 mmu.i_flags &= 0xFB;
                 opcodes.RST_50h.Invoke();
             }
-            if((fired & 0b1000) != 0){
+            if((fired & mmu.INTERRUPT_SERIAl) != 0){
                 //Serial
                 mmu.i_flags &= 0xF7;
                 opcodes.RST_58h.Invoke();
             }
-            if((fired & 0b10000) != 0){
+            if((fired & mmu.INTERRUPT_JOYPAD) != 0){
                 //Joypad press
                 mmu.i_flags &= 0xEF;
                 opcodes.RST_60h.Invoke();

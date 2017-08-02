@@ -435,6 +435,13 @@ public class Debugger extends JFrame{
         });
         windows.add(show_tileviewer);
         
+        JMenuItem show_mapviewer = new JMenuItem("Map Viewer");
+        show_mapviewer.addActionListener((evt) -> {
+            BackgroundViewer viewer = new BackgroundViewer(gb);
+            viewer.setVisible(true);
+        });
+        windows.add(show_mapviewer);
+        
         JMenuItem show_spriteviewer = new JMenuItem("Sprite Viewer");
         show_spriteviewer.addActionListener((evt) -> {
             SpriteViewer viewer = new SpriteViewer(gb);
@@ -477,10 +484,10 @@ public class Debugger extends JFrame{
         int startId = table.getSelectionModel().getMinSelectionIndex();
         int endId = table.getSelectionModel().getMaxSelectionIndex();
         
-        while(memoryTable.Rows() <= mmu.MaxAddress())
+        while(memoryTable.Rows() <= mmu.maxAddress())
             memoryTable.AddRow();
         
-        for(int i = 0; i <= mmu.MaxAddress(); i++){
+        for(int i = 0; i <= mmu.maxAddress(); i++){
             ArrayList<String>  row = memoryTable.GetRow(i);
             
             row.set(0, String.format("%04X", i));
@@ -501,17 +508,17 @@ public class Debugger extends JFrame{
                     String str = op.toString();
                     int n = 0; int nn = 0;
                     if(str.contains("nn")){
-                        if(i <= mmu.MaxAddress() - 2)
+                        if(i <= mmu.maxAddress() - 2)
                             nn = (mmu.rb(i+2) << 8) | mmu.rb(i+1);
                         int d = 0;
                         str = str.replace("nn", String.format("%X", nn));
                         
-                        if(i + 1 < mmu.MaxAddress()){
+                        if(i + 1 < mmu.maxAddress()){
                             memoryTable.GetRow(i+1).set(0,"");
                             memoryTable.GetRow(i+1).set(1,"--");
                             d++;
                         }
-                        if(i + 2 < mmu.MaxAddress()){
+                        if(i + 2 < mmu.maxAddress()){
                             memoryTable.GetRow(i+2).set(0,"");
                             memoryTable.GetRow(i+2).set(1,"--");
                             d++;
@@ -520,12 +527,12 @@ public class Debugger extends JFrame{
                         i += d;
                         row.set(1, str);
                     }else if(str.contains("n")){
-                        if(i <= mmu.MaxAddress())
+                        if(i <= mmu.maxAddress())
                             n = mmu.rb(i+1);
                         int d = 0;
                         str = str.replace("n", String.format("%X", n));
                         
-                        if(i + 1 < mmu.MaxAddress()){
+                        if(i + 1 < mmu.maxAddress()){
                             memoryTable.GetRow(i+1).set(0,"");
                             memoryTable.GetRow(i+1).set(1,"--");
                             d++;

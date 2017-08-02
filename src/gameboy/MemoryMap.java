@@ -48,6 +48,12 @@ public class MemoryMap{
     public int i_enable = 0;    //Which interupts are enabled
     public int i_flags = 0;     //Which interrupts need to be fired
     
+    public final int INTERRUPT_VBLANK = 0b1;
+    public final int INTERRUPT_LCDC = 0b10;
+    public final int INTERRUPT_TIMEROVERFLOW = 0b100;
+    public final int INTERRUPT_SERIAl = 0b1000;
+    public final int INTERRUPT_JOYPAD = 0b10000;
+    
     public void Reset(){
         for(IMemory mem : ctrl){
             if(mem != null)
@@ -59,8 +65,17 @@ public class MemoryMap{
         return lower <= x && x <= upper;
     }
     
-    public int MaxAddress(){
+    public int maxAddress(){
         return 0xFFFF;
+    }
+    
+    public void requestInterrupt(int interrupt){
+        this.i_flags |= interrupt;
+        this.i_flags &= 0xFF;
+    }
+    
+    public boolean interruptEnabled(int interrupt){
+        return  (this.i_enable & (~interrupt) & 0xFF) != 0;
     }
     
     public int rb(int addr){

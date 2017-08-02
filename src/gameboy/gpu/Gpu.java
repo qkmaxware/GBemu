@@ -107,6 +107,7 @@ public class Gpu implements IMemory{
         }
         
         clock += step;  //Step is in m time not in cycles (t)
+        int oldmode = gpumode;
         
         switch(gpumode){
             //In HBlank
@@ -115,7 +116,7 @@ public class Gpu implements IMemory{
                     //end of hblank, for last scanline render screen
                     if(curline == 143){
                         gpumode = Gpu.GPU_VBLANK;
-                        mmu.i_flags |= 1; //Fire vblank interrupt
+                        mmu.requestInterrupt(mmu.INTERRUPT_VBLANK);
                         flushBuffer();
                     }else{
                         gpumode = Gpu.GPU_SCANLINEOAM;
@@ -132,7 +133,7 @@ public class Gpu implements IMemory{
                     curline++;
                     if(curline > 153){
                         curline = 0;
-                        gpumode = Gpu.GPU_SCANLINEOAM;
+                        gpumode = Gpu.GPU_SCANLINEOAM;  
                     }
                 }
                 break;
@@ -149,22 +150,49 @@ public class Gpu implements IMemory{
                 if(clock >= TIME_SCANLINEVRAM / 4){
                     clock = 0;
                     gpumode = Gpu.GPU_HBLANK;
-                    if(lcdon){ 
-                        renderScanline();
-                    }
+                    renderScanline();
                 }
                 break;
+        }
+        
+        //Mode had changed, do I need to fire an interrupt
+        if(oldmode != this.gpumode){
+            //Moved onto starting to draw the next line's OAM stage
+            if(gpumode == Gpu.GPU_SCANLINEOAM){
+                if(this.oamInterruptEnable){
+                    mmu.requestInterrupt(mmu.INTERRUPT_LCDC);
+                } 
+            }
+            //Moved onto starting to draw the next line's VRAM stagex
+            else if(gpumode == Gpu.GPU_SCANLINEVRAM){
+                if(this.coincidenceInterruptEnable && this.curline == this.lyc){
+                    mmu.requestInterrupt(mmu.INTERRUPT_LCDC);
+                }
+            }
+            //Finished a line
+            else if(gpumode == Gpu.GPU_HBLANK){
+                if(this.hblankInterruptEnable){
+                    mmu.requestInterrupt(mmu.INTERRUPT_LCDC);
+                }
+            }
+            //Finished drawing the screen
+            else if(gpumode == Gpu.GPU_VBLANK){
+                if(this.vblankInterruptEnable){
+                    mmu.requestInterrupt(mmu.INTERRUPT_LCDC);
+                }
+            }
         }
     }
     
     public void renderScanline(){
         int[] scanrow = new int[160];
         
+        if(!lcdon){ 
+            return;
+        }
+        
         if(bgon){
-            renderBackgroundLine(
-                this.curline, 
-                scanrow
-            );
+            renderBackgroundLine(this.curline, scanrow);
         }
         
         if(objon){
@@ -184,8 +212,16 @@ public class Gpu implements IMemory{
         return useSmallerTileStartAddress ? 0x0000 : 0x0800;
     }
     
-    public boolean IsBgTileAddressRegionUnsigned(){
-        return GetBgTileStartAddress() !=0 ? false : true;
+    public boolean IsBgTileAddressRegionUnsigned(int tileaddress){
+        return tileaddress !=0 ? false : true;
+    }
+    
+    public int readVRAM(int idx){
+        return this.vram[idx];
+    }
+    
+    public int readTile(int tile, int y, int x){
+        return this.tilemap[tile][y][x];
     }
     
     public void renderBackgroundLine(int scanline, int[] scanrow){
@@ -196,7 +232,7 @@ public class Gpu implements IMemory{
         int scrollY = this.yscroll;
         int scrollX = this.xscroll;
         int windowY = this.ywindow;
-        int windowX = this.xwindow;
+        int windowX = this.xwindow - 7;
         int pixelY = scanline;
         
         //Are we using a window?
@@ -209,7 +245,7 @@ public class Gpu implements IMemory{
         
         //Get address space for tiles
         int tileAddressBase = GetBgTileStartAddress();
-        boolean unsigned = IsBgTileAddressRegionUnsigned();
+        boolean unsigned = IsBgTileAddressRegionUnsigned(tileAddressBase);
         
         //What background memory
         int backgroundAddressBase;
@@ -220,10 +256,8 @@ public class Gpu implements IMemory{
         }
         
         //Which of the 32 vertical tiles am I drawing
-        int tileY;
-        if(!usewindow){
-            tileY = scrollY + scanline;
-        }else{
+        int tileY = scrollY + scanline;
+        if(usewindow){
             tileY = scanline - windowY;
         }
         
@@ -231,7 +265,7 @@ public class Gpu implements IMemory{
         int rowY = ((tileY & 255) / 8) * 32;
         
         //Time to start drawing the scanline
-        for(int pixelX = 0; pixelX < LCD_WIDTH; pixelX++){
+        for(int pixelX = 0; pixelX < buffer.GetWidth(); pixelX++){
             int xpos = pixelX + scrollX;
             
             //Translate into window space
@@ -335,8 +369,6 @@ public class Gpu implements IMemory{
                 canvas.SetColor(x, y, c);
             }
         }
-        
-        //System.out.println("VBLANK");
         
         if(this.OnVBlank != null){
             this.OnVBlank.OnEvent();

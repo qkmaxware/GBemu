@@ -5,6 +5,7 @@
  */
 package main.swing.utilities;
 
+import main.swing.DrawPanel;
 import gameboy.Gameboy;
 import gameboy.gpu.Bitmap;
 import gameboy.gpu.Gpu;
@@ -27,17 +28,7 @@ import javax.swing.JTextField;
  * @author Colin Halseth
  */
 public class SpriteViewer extends JFrame{
-    
-    public interface Action{
-        public void Invoke(Graphics2D g2);
-    }
-    
-    private class DrawPanel extends JPanel{
-        public Action draw;
-        @Override
-        public void paintComponent(Graphics g){ if(draw != null) draw.Invoke((Graphics2D)g); }
-    }
-    
+ 
     private Gpu gpu;
     private int selected =0;
     private Bitmap bmp = new Bitmap(8,8);

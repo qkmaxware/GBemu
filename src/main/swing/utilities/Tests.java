@@ -22,13 +22,13 @@ public class Tests {
         Gameboy gb = new Gameboy();
         System.out.println("Running tests ... please wait.\n");
         
-        //System.out.println("Testing Memory Access");
-        //TestMemory(gb);
-        //System.out.println("");
+        System.out.println("Testing Memory Access");
+        TestMemory(gb);
+        System.out.println("");
         
-        //System.out.println("Testing Registry Read/Write");
-        //TestRegistry(gb);
-        //System.out.println("");
+        System.out.println("Testing Registry Read/Write");
+        TestRegistry(gb);
+        System.out.println("");
         
         System.out.println("Testing Opcodes");
         TestOpcodes(gb);
@@ -41,7 +41,7 @@ public class Tests {
         int start = -1; int end = -1;
         LinkedList<String> ranges = new LinkedList<String>();
         
-        for(int i = 0; i <= mmu.MaxAddress(); i++){
+        for(int i = 0; i <= mmu.maxAddress(); i++){
             mmu.wb(i, i);
             int r = mmu.rb(i);
             

@@ -5,14 +5,13 @@
  */
 package main.swing.utilities;
 
+import main.swing.DrawPanel;
 import gameboy.Gameboy;
 import gameboy.gpu.Bitmap;
 import gameboy.gpu.Gpu;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
-import java.awt.Graphics;
-import java.awt.Graphics2D;
 import java.awt.GridLayout;
 import java.awt.RenderingHints;
 import java.awt.event.MouseAdapter;
@@ -31,16 +30,6 @@ import javax.swing.JTextField;
  * @author Colin Halseth
  */
 public class TileViewer extends JFrame{
-    
-    public interface Action{
-        public void Invoke(Graphics2D g2);
-    }
-    
-    private class DrawPanel extends JPanel{
-        public Action draw;
-        @Override
-        public void paintComponent(Graphics g){ if(draw != null) draw.Invoke((Graphics2D)g); }
-    }
     
     private Gameboy gb;
     private Gpu gpu;

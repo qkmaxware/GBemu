@@ -27,10 +27,13 @@ public class CartridgeAdapter implements IMemory{
                 break;
             case MBC2:
                 controller = (MBC) new MBC2(cart);
+                break;
             case MBC3:
                 controller = (MBC) new MBC3(cart);
+                break;
             default:
                 controller = (MBC) new RomOnly(cart);
+                break;
         }
     }
     
