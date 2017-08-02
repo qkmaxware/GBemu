@@ -7,9 +7,11 @@ package main.swing;
 
 import gameboy.game.Cartridge;
 import gameboy.game.CartridgeFactory;
+import gameboy.io.Input;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.GridLayout;
+import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.io.File;
@@ -42,6 +44,15 @@ public class SwingLauncher extends JFrame{
     public boolean enableTrace = false;
     public int[] launchSize = new int[]{166,144};
     public int frameRateLimit = -1;
+    
+    public int key_up = KeyEvent.VK_UP;
+    public int key_down = KeyEvent.VK_DOWN;
+    public int key_left = KeyEvent.VK_LEFT;
+    public int key_right = KeyEvent.VK_RIGHT;
+    public int key_select = KeyEvent.VK_SPACE;
+    public int key_start = KeyEvent.VK_ENTER;
+    public int key_a = KeyEvent.VK_X;
+    public int key_b = KeyEvent.VK_Z;    
     
     public SwingLauncher(){}
     
@@ -129,6 +140,15 @@ public class SwingLauncher extends JFrame{
         gb.GetGameboy().cpu.debugMode = enableTrace;
         gb.setFPS(this.frameRateLimit);
         gb.setRenderSize(this.launchSize[0], this.launchSize[1]);
+        
+        gb.GetGameboy().input.SetKey(Input.Key.Up, this.key_up);
+        gb.GetGameboy().input.SetKey(Input.Key.Down, this.key_down);
+        gb.GetGameboy().input.SetKey(Input.Key.Left, this.key_left);
+        gb.GetGameboy().input.SetKey(Input.Key.Right, this.key_right);
+        gb.GetGameboy().input.SetKey(Input.Key.Select, this.key_select);
+        gb.GetGameboy().input.SetKey(Input.Key.Start, this.key_start);
+        gb.GetGameboy().input.SetKey(Input.Key.A, this.key_a);
+        gb.GetGameboy().input.SetKey(Input.Key.B, this.key_b);
         
         gb.setTitle("Playing: "+cart.header.title);
         gb.setVisible(true);

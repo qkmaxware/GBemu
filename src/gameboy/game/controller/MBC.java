@@ -28,9 +28,24 @@ public interface MBC{
      */
     public int GetRomOffset();
     
+    /**
+     * Get a reference to the ram array for this controller
+     * @return 
+     */
+    public int[] getRam();
     
+    /**
+     * Read a byte from this controller
+     * @param addr
+     * @return 
+     */
     public int rb(int addr);
     
+    /**
+     * Write a value to this controller (triggers side-effects)
+     * @param addr
+     * @param value 
+     */
     public void wb(int addr, int value);
     
 }

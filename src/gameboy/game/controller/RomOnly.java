@@ -42,6 +42,10 @@ public class RomOnly implements MBC{
         return lower <= x && x <= upper;
     }
     
+    public int[] getRam(){
+        return this.eram;
+    }
+    
     @Override
     public int rb(int addr) {
         int romoff = GetRomOffset(); //Rom bank 1

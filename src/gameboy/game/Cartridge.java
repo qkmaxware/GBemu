@@ -17,6 +17,7 @@ import java.io.File;
 public class Cartridge{
 
     public File source;
+    public File battery;
     public final RomInfo header;
     private int[] rom;
     

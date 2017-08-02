@@ -43,7 +43,11 @@ public class MBC2 implements MBC{
     public int GetRomOffset() {
         return rombank * 0x4000;
     }
-
+    
+    public int[] getRam(){
+        return this.eram;
+    }
+    
     @Override
     public int rb(int addr) {
         //ROM BANK 0 (Read Only)

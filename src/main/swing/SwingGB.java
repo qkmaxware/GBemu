@@ -72,7 +72,6 @@ public class SwingGB extends JFrame{
                 Stop();
             }
         });
-        
         gb.Reset();
         
         //If told to autoplay, then play 
@@ -105,6 +104,7 @@ public class SwingGB extends JFrame{
     
     public void Stop(){
         thread.killThread();
+        gb.cartridge.SaveRam();
     }
     
     public void Once(Action action){

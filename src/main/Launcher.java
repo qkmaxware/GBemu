@@ -5,6 +5,7 @@
  */
 package main;
 
+import com.sun.glass.events.KeyEvent;
 import java.awt.Dimension;
 import javax.swing.SwingUtilities;
 import main.swing.SwingLauncher;
@@ -24,7 +25,15 @@ public class Launcher {
             "CPU TRACE: FALSE",
             "RENDER SIZE: 1x",
             "ENABLE FRAME LIMIT: TRUE",
-            "FRAME RATE: 60"
+            "FRAME RATE: 60",
+            "INPUT UP: "+KeyEvent.VK_UP,
+            "INPUT DOWN: "+KeyEvent.VK_DOWN,
+            "INPUT LEFT: "+KeyEvent.VK_LEFT,
+            "INPUT RIGHT: "+KeyEvent.VK_RIGHT,
+            "INPUT START: "+KeyEvent.VK_ENTER,
+            "INPUT SELECT: "+KeyEvent.VK_SPACE,
+            "INPUT A: "+KeyEvent.VK_X,
+            "INPUT B: "+KeyEvent.VK_Z,
         });
         
         //Load user configs and update config file with missing or new DEFAULT attributes
@@ -53,6 +62,14 @@ public class Launcher {
             }
         }
         window.frameRateLimit = userConfig.isSet("ENABLE FRAME LIMIT") ? userConfig.getInt("FRAME RATE") : -1;
+        window.key_up = userConfig.getInt("INPUT UP");
+        window.key_down = userConfig.getInt("INPUT DOWN");
+        window.key_left = userConfig.getInt("INPUT LEFT");
+        window.key_right = userConfig.getInt("INPUT RIGHT");
+        window.key_select = userConfig.getInt("INPUT SELECT");
+        window.key_start = userConfig.getInt("INPUT START");
+        window.key_a = userConfig.getInt("INPUT A");
+        window.key_b = userConfig.getInt("INPUT B");
         
         //Invoke the gui on the Swing thread not the main thread
         SwingUtilities.invokeLater(() -> {

@@ -123,6 +123,10 @@ public class MBC3 implements MBC{
         return lower <= x && x <= upper;
     }
     
+    public int[] getRam(){
+        return this.eram;
+    }
+    
     //TODO READ/WRITE RTC registers
     public int rb(int addr){
         //Create the appropriate offsets if required

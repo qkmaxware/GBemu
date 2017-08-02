@@ -33,6 +33,10 @@ public class CartType {
             this.hasBattery = bat;
         }
         
+        public String toString(){
+            return this.mbc + (hasRam ? " + RAM" : "") + (hasBattery ? " + BATTERY" : "");
+        }
+        
         public static CartType decode(int headerValue){
              switch(headerValue){
                 case 0x08: //Rom + RAM

@@ -40,6 +40,7 @@ public class CartridgeFactory {
             
             Cartridge c = new Cartridge(unsignedBytes);
             c.source = f;
+            c.battery = new File(f.getAbsoluteFile()+".battery");
             
             return c;
         }

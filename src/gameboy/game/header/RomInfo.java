@@ -114,7 +114,7 @@ public class RomInfo {
         details+="\n: Region: "+this.region;
         details+="\n: Color Type: "+this.cgb;
         details+="\n: SGB Support: "+this.sgb;
-        details+="\n: Cartridge Type: "+this.cartType.mbc;
+        details+="\n: Cartridge Type: "+this.cartType.toString();
         details+="\n: LicenceCode: "+this.licencee + "("+ this.licenceeCode+")";
         details+="\n: Rom size: "+this.romClass.size+"KB";
         details+="\n   - Banks: "+this.romClass.banks;

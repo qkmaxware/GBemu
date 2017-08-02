@@ -43,6 +43,10 @@ public class MBC1 implements MBC{
         return lower <= x && x <= upper;
     }
     
+    public int[] getRam(){
+        return this.eram;
+    }
+    
     public int rb(int addr){
         //Create the appropriate offsets if required
         int romoff = GetRomOffset(); //Rom bank 1

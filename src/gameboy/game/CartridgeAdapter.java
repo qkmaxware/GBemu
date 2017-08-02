@@ -8,6 +8,11 @@ package gameboy.game;
 import gameboy.game.controller.*;
 import gameboy.IMemory;
 import gameboy.MemoryMap;
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
 
 /**
  * Acts as a stable interface between a game cartridge and a memory model
@@ -35,6 +40,8 @@ public class CartridgeAdapter implements IMemory{
                 controller = (MBC) new RomOnly(cart);
                 break;
         }
+        
+        LoadRam();
     }
     
     public boolean supportsCGB(){
@@ -43,24 +50,42 @@ public class CartridgeAdapter implements IMemory{
         return cart.supportsCGB();
     }
     
-    /*
-    public void LoadRam() throws IOException{
-        BufferedReader reader = new BufferedReader(new FileReader(this.cart.source.getAbsolutePath()+".battery"));
-        String s; int idx = 0;
-        while((s = reader.readLine()) != null && idx < eram.length){
-            eram[idx] = Integer.parseInt(s, 16);
+    public void LoadRam(){
+        if(this.controller == null || !cart.header.cartType.hasBattery)
+            return;
+        
+        try{
+            if(!this.cart.battery.exists())
+                return;
+            BufferedReader reader = new BufferedReader(new FileReader(this.cart.battery));
+            String s; int idx = 0;
+            while((s = reader.readLine()) != null && idx < controller.getRam().length){
+                controller.getRam()[idx] = Integer.parseInt(s, 16) & 0xFF;
+            }
+        }catch(IOException iex){
+            System.out.println("Failed to load ram file");
+            iex.printStackTrace();
         }
     }
-    
-    public void SaveRam() throws IOException{
-        BufferedWriter ow = new BufferedWriter(new FileWriter(this.cart.source.getAbsolutePath()+".battery"));
-        for(int i = 0; i < this.eram.length; i++){
-            ow.write(Integer.toHexString(eram[i]));
-            ow.newLine();
+
+    public void SaveRam(){
+        //No battery means no saveable ram
+        if(controller == null || !cart.header.cartType.hasBattery)
+            return;
+        
+        try{
+            BufferedWriter ow = new BufferedWriter(new FileWriter(this.cart.battery));
+            for(int i = 0; i < controller.getRam().length; i++){
+                ow.write(Integer.toHexString(controller.getRam()[i]));
+                ow.newLine();
+            }
+            ow.flush();
+            ow.close();
+        }catch(IOException iex){
+            System.out.println("Failed to save ram file");
+            iex.printStackTrace();
         }
-        ow.flush();
-        ow.close();
-    }*/
+    }
     
     @Override
     public void Reset() {
@@ -70,15 +95,17 @@ public class CartridgeAdapter implements IMemory{
 
     @Override
     public int rb(int addr) {
-        if(this.controller != null)
+        if(this.controller != null){
             return this.controller.rb(addr);
+        }
         return 0;
     }
 
     @Override
     public void wb(int addr, int value) {
-        if(this.controller != null)
+        if(this.controller != null){
             this.controller.wb(addr, value);
+        }
     }
     
     public void SetMMU(MemoryMap mmu){}

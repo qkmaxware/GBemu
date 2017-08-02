@@ -40,30 +40,34 @@ public class Input implements IMemory{
     }
     
     public void SetKey(Key key, KeyEvent evt){
+        SetKey(key, evt.getKeyCode());
+    }
+    
+    public void SetKey(Key key, int code){
         switch(key){
             case Up:
-                this.up = evt.getKeyCode();
+                this.up = code;
                 break;
             case Down:
-                this.down = evt.getKeyCode();
+                this.down = code;
                 break;
             case Left:
-                this.left = evt.getKeyCode();
+                this.left = code;
                 break;
             case Right:
-                this.right = evt.getKeyCode();
+                this.right = code;
                 break;
             case Select:
-                this.select = evt.getKeyCode();
+                this.select = code;
                 break;
             case Start:
-                this.start = evt.getKeyCode();
+                this.start = code;
                 break;
             case A:
-                this.a = evt.getKeyCode();
+                this.a = code;
                 break;
             case B:
-                this.b = evt.getKeyCode();
+                this.b = code;
                 break;
         }
     }

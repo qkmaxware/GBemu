@@ -56,8 +56,9 @@ public class MemoryMap{
     
     public void Reset(){
         for(IMemory mem : ctrl){
-            if(mem != null)
+            if(mem != null){
                 mem.Reset();
+            }
         }
     }
     

@@ -27,7 +27,7 @@ public class Gameboy {
     public final MemoryMap mmu;
     public final Input input;
     public final Timer timer;
-    private final CartridgeAdapter adapter;
+    public final CartridgeAdapter cartridge;
 
     public Gameboy(){
         
@@ -37,7 +37,7 @@ public class Gameboy {
         gpu = new Gpu();
         input = new Input();
         timer = new Timer();
-        adapter = new CartridgeAdapter();
+        cartridge = new CartridgeAdapter();
         SerialConnection sysio = new SerialConnection(new InputStreamReader(System.in), new OutputStreamWriter(System.out));
         sysio.EnableWrite(false);
         
@@ -51,9 +51,9 @@ public class Gameboy {
         mmu.Set(MemoryMap.VRAM, gpu);
         mmu.Set(MemoryMap.GPU, gpu);
         
-        mmu.Set(MemoryMap.ROM_BANK_0, adapter);
-        mmu.Set(MemoryMap.ROM_BANK_1, adapter);
-        mmu.Set(MemoryMap.EXTERNAL_RAM, adapter);
+        mmu.Set(MemoryMap.ROM_BANK_0, cartridge);
+        mmu.Set(MemoryMap.ROM_BANK_1, cartridge);
+        mmu.Set(MemoryMap.EXTERNAL_RAM, cartridge);
         
         mmu.Set(MemoryMap.SERIALIO, sysio);
         
@@ -65,11 +65,15 @@ public class Gameboy {
         mmu.Reset();
         gpu.Reset();
         cpu.Reset();
+        input.Reset();
+        timer.Reset();
+        cartridge.Reset();
+        System.out.println("GB reset");
     }
     
     public void LoadCartridge(Cartridge cart){
-        adapter.LoadCart(cart);
         Reset();
+        cartridge.LoadCart(cart);
     }
     
     public void OnBufferReady(Listener listener){

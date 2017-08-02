@@ -163,7 +163,7 @@ public class Gpu implements IMemory{
                     mmu.requestInterrupt(mmu.INTERRUPT_LCDC);
                 } 
             }
-            //Moved onto starting to draw the next line's VRAM stagex
+            //Moved onto starting to draw the next line's VRAM stage
             else if(gpumode == Gpu.GPU_SCANLINEVRAM){
                 if(this.coincidenceInterruptEnable && this.curline == this.lyc){
                     mmu.requestInterrupt(mmu.INTERRUPT_LCDC);
