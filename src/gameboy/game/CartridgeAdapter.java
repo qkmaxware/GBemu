@@ -50,6 +50,9 @@ public class CartridgeAdapter implements IMemory{
         return cart.supportsCGB();
     }
     
+    /**
+     * Load ram for a rom from file. Ram file name is rom file name + ".battery"
+     */
     public void LoadRam(){
         if(this.controller == null || !cart.header.cartType.hasBattery)
             return;
@@ -60,7 +63,7 @@ public class CartridgeAdapter implements IMemory{
             BufferedReader reader = new BufferedReader(new FileReader(this.cart.battery));
             String s; int idx = 0;
             while((s = reader.readLine()) != null && idx < controller.getRam().length){
-                controller.getRam()[idx] = Integer.parseInt(s, 16) & 0xFF;
+                controller.getRam()[idx++] = Integer.parseInt(s, 16) & 0xFF;
             }
         }catch(IOException iex){
             System.out.println("Failed to load ram file");
@@ -68,6 +71,9 @@ public class CartridgeAdapter implements IMemory{
         }
     }
 
+    /**
+     * Save the cartridge ram to file
+     */
     public void SaveRam(){
         //No battery means no saveable ram
         if(controller == null || !cart.header.cartType.hasBattery)

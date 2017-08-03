@@ -29,7 +29,7 @@ public class SwingGB extends JFrame{
     
     private RenderPanel panel;
     
-    public SwingGB(boolean autoplay){
+    public SwingGB(){
         super();
         
         //Create the render panel
@@ -74,55 +74,93 @@ public class SwingGB extends JFrame{
         });
         gb.Reset();
         
-        //If told to autoplay, then play 
-        if(autoplay)
-            thread.playThread();
     }
     
+    /**
+     * Set a frame limit on this emulator
+     * @param fps 
+     */
     public void setFPS(int fps){
         float secondsPerFrame = 1.0f/fps;
         long millisecondsPerFrame = (long)(secondsPerFrame * 1000);
         this.limiter.setLimit(millisecondsPerFrame);
     }
     
+    /**
+     * Set the size of the render panel
+     * @param multiple 
+     */
     public void setRenderSize(int multiple){
         setRenderSize(166*multiple, 144*multiple);
     }
     
+    /**
+     * Set the size of the render panel
+     * @param q
+     * @param h
+     */
     public void setRenderSize(int w, int h){
         panel.setPreferredSize(new Dimension(w, h));
         this.pack();
     }
     
+    /**
+     * Start the emulator loop
+     */
     public void Play(){
         thread.playThread();
     }
     
+    /**
+     * Pause the emulator loop
+     */
     public void Pause(){
         thread.pauseThread();
     }
     
+    /**
+     * Stop the emulator loop
+     */
     public void Stop(){
         thread.killThread();
         gb.cartridge.SaveRam();
     }
     
+    /**
+     * Register an action to occur once
+     * @param action 
+     */
     public void Once(Action action){
         this.onetimeStepListeners.add(action);
     }
     
+    /**
+     * Register an action to occur on each loop
+     * @param action 
+     */
     public void On(Action action){
         this.stepListeners.add(action);
     }
     
+    /**
+     * Remove an action from the loop listener
+     * @param action 
+     */
     public void Off(Action action){
         this.stepListeners.remove(action);
     }
     
+    /**
+     * Get a reference to the gameboy
+     * @return 
+     */
     public Gameboy GetGameboy(){
         return this.gb;
     }
     
+    /**
+     * Perform a single loop of the emulator
+     */
     private void Step(){
         //Play one step of the Gameboy 
         gb.Dispatch();

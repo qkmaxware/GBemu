@@ -133,8 +133,12 @@ public class SwingLauncher extends JFrame{
         this.add(contentPane);
     }
     
+    /**
+     * Start the Swing GB emulator with the loaded configuration
+     * @param cart 
+     */
     public void StartEmulator(Cartridge cart){
-        SwingGB gb = new SwingGB(autoPlay);
+        SwingGB gb = new SwingGB();
         gb.GetGameboy().LoadCartridge(cart);
         
         gb.GetGameboy().cpu.debugMode = enableTrace;
@@ -157,8 +161,16 @@ public class SwingLauncher extends JFrame{
             Debugger debugger = new Debugger(gb);
             debugger.setVisible(true);
         }
+        
+        if(autoPlay){
+            gb.Play();
+        }
     }
     
+    /**
+     * Get a list of all .gb files from the rom directory and create game Cartridges for them
+     * @return 
+     */
     public Cartridge[] GetLocalCartridges(){
         String[] locations = romLocation.split(",");
 

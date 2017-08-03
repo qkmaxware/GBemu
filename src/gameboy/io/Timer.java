@@ -95,8 +95,7 @@ public class Timer implements IMemory{
         
         if(reg.tima > 255){
             reg.tima = reg.tma;
-            if(mmu.interruptEnabled(mmu.INTERRUPT_TIMEROVERFLOW))
-                mmu.requestInterrupt(mmu.INTERRUPT_TIMEROVERFLOW);
+            mmu.requestInterrupt(mmu.INTERRUPT_TIMEROVERFLOW);
         }
     }
     
