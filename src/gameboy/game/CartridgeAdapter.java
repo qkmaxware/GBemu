@@ -36,7 +36,11 @@ public class CartridgeAdapter implements IMemory{
             case MBC3:
                 controller = (MBC) new MBC3(cart);
                 break;
+            case MBC5:
+                controller = (MBC) new MBC5(cart);
+                break;
             default:
+                System.out.println("Unsupported cart type"); //throw new RuntimeException("Unsupported cart type");
                 controller = (MBC) new RomOnly(cart);
                 break;
         }
@@ -54,7 +58,7 @@ public class CartridgeAdapter implements IMemory{
      * Load ram for a rom from file. Ram file name is rom file name + ".battery"
      */
     public void LoadRam(){
-        if(this.controller == null || !cart.header.cartType.hasBattery)
+        if(this.cart == null || this.controller == null || !cart.header.cartType.hasBattery)
             return;
         
         try{
@@ -76,7 +80,7 @@ public class CartridgeAdapter implements IMemory{
      */
     public void SaveRam(){
         //No battery means no saveable ram
-        if(controller == null || !cart.header.cartType.hasBattery)
+        if(this.cart == null || controller == null || !cart.header.cartType.hasBattery)
             return;
         
         try{
@@ -95,8 +99,10 @@ public class CartridgeAdapter implements IMemory{
     
     @Override
     public void Reset() {
-        if(this.controller != null)
+        if(this.controller != null){
             this.controller.Reset();
+        }
+        LoadRam();
     }
 
     @Override
